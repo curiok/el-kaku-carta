@@ -1,0 +1,31 @@
+{
+  "name": "el-kaku-carta-suite",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "El Kaku - Carta Digital PWA y Panel de Administración Local",
+  "workspaces": [
+    "admin",
+    "public-menu",
+    "publisher"
+  ],
+  "scripts": {
+    "dev:admin": "npm --workspace=admin run dev",
+    "dev:menu": "npm --workspace=public-menu run dev",
+    "start:publisher": "node publisher/server.js",
+    "build:menu": "npm --workspace=public-menu run build",
+    "build:admin": "npm --workspace=admin run build",
+    "build": "npm run build:menu && npm run build:admin",
+    "bundle:static": "npm run build && node publisher/export-bundle.js",
+    "test": "node tests/run-all-tests.js"
+  },
+  "keywords": [
+    "el-kaku",
+    "carta-digital",
+    "pwa",
+    "whatsapp",
+    "gastronomia"
+  ],
+  "author": "El Kaku",
+  "license": "MIT"
+}

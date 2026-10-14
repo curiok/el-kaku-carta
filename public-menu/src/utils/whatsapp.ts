@@ -1,0 +1,70 @@
+import type { CartItem, DeliveryType } from '../types';
+
+export function normalizeWhatsAppNumber(phone: string): string {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '');
+}
+
+export interface BuildWhatsAppOrderParams {
+  businessName?: string;
+  orderId?: string;
+  customerName: string;
+  deliveryType: DeliveryType;
+  address?: string;
+  items: CartItem[];
+  subtotal?: number;
+  deliveryFee?: number;
+  total?: number;
+  notes?: string;
+}
+
+export function buildWhatsAppOrderMessage(params: BuildWhatsAppOrderParams): string {
+  const {
+    businessName = 'EL KAKU',
+    customerName,
+    deliveryType,
+    address,
+    items = []
+  } = params;
+
+  const isDelivery = deliveryType === 'delivery';
+  const name = (customerName || '').trim();
+  const house = (address || '').trim();
+
+  const lines: string[] = [
+    `*PEDIDO NUEVO — ${businessName.toUpperCase()}*`,
+    '',
+    `*Nombre:* ${name}`,
+    '',
+    `*Modalidad:* ${isDelivery ? 'Delivery' : 'Retiro'}`
+  ];
+
+  if (isDelivery && house) {
+    lines.push('');
+    lines.push(`*Casa de:* ${house}`);
+  }
+
+  lines.push('');
+  lines.push('*PEDIDO:*');
+  lines.push('');
+
+  const formattedItems = items.map((item, index) => {
+    const num = index + 1;
+    const itemTitle = `${num}. ${item.quantity} x ${item.productName}`;
+    if (item.selectedOptions && item.selectedOptions.length > 0) {
+      const optionsLines = item.selectedOptions.map(opt => `   - ${opt.groupName}: ${opt.optionName}`);
+      return `${itemTitle}\n${optionsLines.join('\n')}`;
+    }
+    return itemTitle;
+  }).join('\n');
+
+  lines.push(formattedItems);
+
+  return lines.join('\n');
+}
+
+export function createWhatsAppLink(phoneNumber: string, message: string): string {
+  const cleanPhone = normalizeWhatsAppNumber(phoneNumber);
+  const encoded = encodeURIComponent(message);
+  return `https://wa.me/${cleanPhone}?text=${encoded}`;
+}
