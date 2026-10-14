@@ -10,7 +10,6 @@ import {
   Plus
 } from 'lucide-react';
 import { CartProvider, useCart } from './context/CartContext';
-import { ProductModal } from './components/ProductModal';
 import { CartDrawer } from './components/CartDrawer';
 import { Lightbox } from './components/Lightbox';
 import { fetchLiveMenuData } from './supabase';
@@ -27,9 +26,7 @@ function PublicMenuInner() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
 
-  // Modals
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  // Modals & Drawers
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   // Lightbox
@@ -66,18 +63,9 @@ function PublicMenuInner() {
     loadMenu();
   }, []);
 
-  const handleOpenProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setIsProductModalOpen(true);
-  };
-
   const handleQuickAdd = (product: Product) => {
-    const hasOptions = product.optionGroupIds && product.optionGroupIds.length > 0;
-    if (hasOptions) {
-      handleOpenProduct(product);
-    } else {
-      addItem(product, 1, []);
-    }
+    if (!product || !product.isAvailable) return;
+    addItem(product, 1, []);
   };
 
   const handleOpenLightbox = (images: string[], index = 0) => {
@@ -268,8 +256,6 @@ function PublicMenuInner() {
               const mainImg = product.images && product.images.length > 0
                 ? product.images[product.mainImageIndex || 0] || product.images[0]
                 : null;
-              const hasOptions = product.optionGroupIds && product.optionGroupIds.length > 0;
-
               return (
                 <div key={product.id} className="product-card">
                   {/* Image with Lightbox click */}
@@ -314,23 +300,14 @@ function PublicMenuInner() {
                       {product.description || 'Elaborado artesanalmente en El Kaku.'}
                     </p>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                        {hasOptions ? 'Personalizable con extras' : 'Listo para agregar'}
-                      </span>
-
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px' }}>
                       <button
                         className="btn btn-primary btn-sm"
-                        style={{ padding: '8px 14px', borderRadius: 'var(--radius-full)' }}
+                        style={{ padding: '8px 18px', borderRadius: 'var(--radius-full)' }}
                         onClick={() => handleQuickAdd(product)}
+                        aria-label={`Agregar ${product.name} al carrito`}
                       >
-                        {hasOptions ? (
-                          'Personalizar'
-                        ) : (
-                          <>
-                            <Plus size={14} /> Agregar
-                          </>
-                        )}
+                        <Plus size={14} /> Agregar
                       </button>
                     </div>
                   </div>
@@ -357,16 +334,6 @@ function PublicMenuInner() {
           <span>{formatCurrency(subtotal)}</span>
         </button>
       )}
-
-      {/* Customization Modal */}
-      <ProductModal
-        product={selectedProduct}
-        optionGroups={menuData.optionGroups}
-        isOpen={isProductModalOpen}
-        onClose={() => setIsProductModalOpen(false)}
-        onAddToCart={addItem}
-        onOpenLightbox={handleOpenLightbox}
-      />
 
       {/* Cart Drawer */}
       <CartDrawer

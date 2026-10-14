@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   UtensilsCrossed,
   FolderTree,
-  Sliders,
   ShoppingBag,
   UploadCloud,
   ExternalLink,
@@ -100,10 +99,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           onClick={() => onNavigate('products')}
         >
           <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)' }}>
-            {stats.activeProducts}
+            {stats.totalProducts}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-            Productos Activos
+            Productos
           </div>
         </div>
 
@@ -246,24 +245,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           <span style={{ fontSize: '13px', fontWeight: 700 }}>Categorías</span>
           <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 400 }}>
             {stats.totalCategories} categorías
-          </span>
-        </button>
-
-        <button
-          className="btn btn-secondary"
-          style={{
-            flexDirection: 'column',
-            padding: '16px 12px',
-            height: 'auto',
-            alignItems: 'flex-start',
-            textAlign: 'left'
-          }}
-          onClick={() => onNavigate('options')}
-        >
-          <Sliders size={22} color="#a855f7" style={{ marginBottom: '8px' }} />
-          <span style={{ fontSize: '13px', fontWeight: 700 }}>Opciones y Extras</span>
-          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 400 }}>
-            Panes, cocción, adicionales
           </span>
         </button>
 

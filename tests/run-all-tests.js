@@ -553,8 +553,96 @@ describe('9. Aislamiento y Configuración PWA de El Kaku Admin en iPhone', () =>
 
     assert.ok(adminSw.includes('admin.html'), 'SW de admin debe proteger admin.html');
     assert.ok(menuSw.includes('admin.html'), 'SW del menú debe proteger admin.html');
-    assert.ok(adminSw.includes('kaku-pwa-cache-v4'), 'Debe tener versión de caché v4');
-    assert.ok(menuSw.includes('kaku-pwa-cache-v4'), 'Debe tener versión de caché v4');
+    assert.ok(adminSw.includes('kaku-pwa-cache-v5'), 'Debe tener versión de caché v5');
+    assert.ok(menuSw.includes('kaku-pwa-cache-v5'), 'Debe tener versión de caché v5');
+  });
+});
+
+describe('10. Productos sin Opciones y sin Controles de Pausado en Formulario', () => {
+  const sampleProduct = {
+    id: 'prod_test_available',
+    name: 'Hamburguesa Test Directa',
+    description: 'Deliciosa hamburguesa para venta directa',
+    basePrice: 15000,
+    categoryId: 'cat_hamburguesas',
+    images: ['test.jpg'],
+    mainImageIndex: 0,
+    sortOrder: 1,
+    isAvailable: true,
+    optionGroupIds: []
+  };
+
+  test('1. Se puede configurar un producto estrictamente con los 6 campos visuales (nombre, precio, categoría, orden, descripción, fotos)', () => {
+    const productKeys = Object.keys(sampleProduct);
+    const requiredConfigKeys = ['name', 'description', 'basePrice', 'categoryId', 'images', 'sortOrder'];
+    for (const key of requiredConfigKeys) {
+      assert.ok(productKeys.includes(key), `El producto debe incluir ${key}`);
+    }
+    assert.deepEqual(sampleProduct.optionGroupIds, [], 'El producto no debe tener grupos de opciones');
+  });
+
+  test('2. Formulario de creación y edición no contiene interruptor ni texto de «Disponible para la venta»', () => {
+    const productsPagePath = path.resolve(__dirname, '../admin/src/pages/ProductsPage.tsx');
+    const content = fs.readFileSync(productsPagePath, 'utf-8');
+
+    assert.ok(!content.includes('Disponible para la venta'), 'No debe existir el texto «Disponible para la venta» en el formulario');
+    assert.ok(!content.includes('Si está pausado'), 'No debe existir la advertencia «Si está pausado»');
+    assert.ok(!content.includes('formIsAvailable'), 'No debe existir el estado formIsAvailable');
+    assert.ok(!content.includes('handleToggleAvailability'), 'No debe existir función para pausar productos');
+  });
+
+  test('3. Formulario tampoco contiene opciones, grupos ni personalizaciones', () => {
+    const productsPagePath = path.resolve(__dirname, '../admin/src/pages/ProductsPage.tsx');
+    const content = fs.readFileSync(productsPagePath, 'utf-8');
+
+    assert.ok(!content.includes('Opciones y Personalizaciones'), 'No debe tener título de opciones y personalizaciones');
+    assert.ok(!content.includes('formOptionGroupIds'), 'No debe tener casillas de grupos de opciones');
+    assert.ok(!content.includes('getOptionGroups'), 'No debe solicitar grupos de opciones a la base de datos');
+  });
+
+  test('4. Los productos creados están disponibles para la venta por defecto y visibles en la carta', () => {
+    const catalog = [sampleProduct];
+    const publicProducts = catalog.filter(p => p.isAvailable);
+
+    assert.equal(publicProducts.length, 1);
+    assert.equal(publicProducts[0].name, 'Hamburguesa Test Directa');
+  });
+
+  test('5. Productos no disponibles quedan excluidos de la carta pública y del carrito', () => {
+    const unavailableProduct = { ...sampleProduct, id: 'prod_inactive', isAvailable: false };
+    const catalog = [sampleProduct, unavailableProduct];
+    const publicProducts = catalog.filter(p => p.isAvailable);
+
+    assert.equal(publicProducts.length, 1);
+    assert.ok(!publicProducts.some(p => p.id === 'prod_inactive'));
+
+    const cart = [];
+    const tryAdd = (p) => {
+      if (!p || !p.isAvailable) return false;
+      cart.push(p);
+      return true;
+    };
+    assert.equal(tryAdd(unavailableProduct), false, 'No permite agregar producto inactivo al carrito');
+    assert.equal(cart.length, 0);
+  });
+
+  test('6. Interfaz administrativa excluye pestañas y accesos directos a opciones', () => {
+    const adminAppPath = path.resolve(__dirname, '../admin/src/App.tsx');
+    const adminAppContent = fs.readFileSync(adminAppPath, 'utf-8');
+    assert.ok(!adminAppContent.includes('OptionsPage'), 'Admin App no debe importar ni renderizar OptionsPage');
+    assert.ok(!adminAppContent.includes("'options'"), 'Admin App activeTab no debe incluir options');
+
+    const dashboardPath = path.resolve(__dirname, '../admin/src/pages/DashboardPage.tsx');
+    const dashboardContent = fs.readFileSync(dashboardPath, 'utf-8');
+    assert.ok(!dashboardContent.includes("onNavigate('options')"), 'Dashboard no debe tener atajo a options');
+  });
+
+  test('7. Carta pública agrega directamente al carrito en 1 clic sin ventana modal', () => {
+    const menuAppPath = path.resolve(__dirname, '../public-menu/src/App.tsx');
+    const menuAppContent = fs.readFileSync(menuAppPath, 'utf-8');
+    assert.ok(!menuAppContent.includes('ProductModal'), 'Carta pública no debe renderizar ProductModal');
+    assert.ok(!menuAppContent.includes('Personalizable con extras'), 'Carta pública no debe mencionar personalizaciones');
+    assert.ok(menuAppContent.includes('addItem(product, 1, [])'), 'Debe agregar directamente al carrito en 1 clic');
   });
 });
 

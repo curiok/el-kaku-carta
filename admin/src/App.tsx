@@ -3,7 +3,6 @@ import {
   Home,
   UtensilsCrossed,
   FolderTree,
-  Sliders,
   ShoppingBag,
   UploadCloud,
   Settings as SettingsIcon,
@@ -17,7 +16,6 @@ import { LoginPage } from './components/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
-import { OptionsPage } from './pages/OptionsPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { PublishPage } from './pages/PublishPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -27,7 +25,7 @@ import './styles/admin.css';
 
 function AdminMainContent() {
   const { isAuthenticated, isLoading, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'categories' | 'options' | 'orders' | 'publish' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'publish' | 'settings'>('dashboard');
   const [openNewProductModal, setOpenNewProductModal] = useState(false);
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -145,7 +143,6 @@ function AdminMainContent() {
           />
         )}
         {activeTab === 'categories' && <CategoriesPage />}
-        {activeTab === 'options' && <OptionsPage />}
         {activeTab === 'orders' && <OrdersPage />}
         {activeTab === 'publish' && <PublishPage />}
         {activeTab === 'settings' && <SettingsPage />}
