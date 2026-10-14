@@ -41,8 +41,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return `${productId}__${sortedOptionKeys}`;
   };
 
-  const addItem = (product: Product, quantity: number, options: CartItemOption[]) => {
-    if (quantity <= 0) return;
+  const addItem = (product: Product, quantity: number, options: CartItemOption[] = []) => {
+    // If product is not available for sale, it cannot be added to cart under any circumstance
+    if (!product || !product.isAvailable || quantity <= 0) return;
 
     const cartItemId = generateCartItemId(product.id, options);
     const optionsSum = options.reduce((sum, opt) => sum + (opt.additionalPrice || 0), 0);

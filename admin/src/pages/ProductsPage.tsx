@@ -7,19 +7,16 @@ import {
   Edit2,
   Trash2,
   Eye,
-  Sliders,
-  CheckCircle2,
-  PauseCircle,
   X,
   ArrowUpDown,
   UtensilsCrossed
 } from 'lucide-react';
-import { getProducts, saveProduct, deleteProduct, getCategories, getOptionGroups } from '../db';
+import { getProducts, saveProduct, deleteProduct, getCategories } from '../db';
 import { formatCurrency, generateId } from '../utils/formatters';
 import { ImageUploader } from '../components/ImageUploader';
 import { Lightbox } from '../components/Lightbox';
 import { useToast } from '../components/Toast';
-import type { Product, Category, OptionGroup } from '../types';
+import type { Product, Category } from '../types';
 
 interface ProductsPageProps {
   initialOpenNewModal?: boolean;
@@ -32,24 +29,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [optionGroups, setOptionGroups] = useState<OptionGroup[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
-  const [availabilityFilter, setAvailabilityFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ALL');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Form State
+  // Form State (Only: Nombre, Descripción, Precio, Categoría, Fotografías, Orden)
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formPrice, setFormPrice] = useState<number>(0);
   const [formCategoryId, setFormCategoryId] = useState('');
   const [formImages, setFormImages] = useState<string[]>([]);
   const [formMainImageIndex, setFormMainImageIndex] = useState(0);
-  const [formIsAvailable, setFormIsAvailable] = useState(true);
-  const [formOptionGroupIds, setFormOptionGroupIds] = useState<string[]>([]);
+  const [formSortOrder, setFormSortOrder] = useState<number>(1);
 
   // Preview Modal
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
@@ -63,14 +57,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
   const loadAll = async () => {
     try {
-      const [prods, cats, opts] = await Promise.all([
+      const [prods, cats] = await Promise.all([
         getProducts(),
-        getCategories(),
-        getOptionGroups()
+        getCategories()
       ]);
       setProducts(prods);
       setCategories(cats);
-      setOptionGroups(opts);
     } catch (err: any) {
       showError(`Error al cargar productos: ${err.message}`);
     }
@@ -95,8 +87,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setFormCategoryId(categories[0]?.id || '');
     setFormImages([]);
     setFormMainImageIndex(0);
-    setFormIsAvailable(true);
-    setFormOptionGroupIds([]);
+    setFormSortOrder(products.length + 1);
     setIsModalOpen(true);
   };
 
@@ -108,8 +99,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setFormCategoryId(p.categoryId);
     setFormImages(p.images || []);
     setFormMainImageIndex(p.mainImageIndex || 0);
-    setFormIsAvailable(p.isAvailable);
-    setFormOptionGroupIds(p.optionGroupIds || []);
+    setFormSortOrder(p.sortOrder || 1);
     setIsModalOpen(true);
   };
 
@@ -138,9 +128,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       categoryId: formCategoryId,
       images: formImages,
       mainImageIndex: formImages.length > 0 ? Math.min(formMainImageIndex, formImages.length - 1) : 0,
-      sortOrder: editingProduct ? editingProduct.sortOrder : products.length + 1,
-      isAvailable: formIsAvailable,
-      optionGroupIds: formOptionGroupIds,
+      sortOrder: Math.max(1, Number(formSortOrder) || 1),
+      isAvailable: true,
+      optionGroupIds: [],
       createdAt: editingProduct ? editingProduct.createdAt : now,
       updatedAt: now
     };
@@ -155,27 +145,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     }
   };
 
-  const handleToggleAvailability = async (p: Product) => {
-    const updated: Product = {
-      ...p,
-      isAvailable: !p.isAvailable,
-      updatedAt: new Date().toISOString()
-    };
-    try {
-      await saveProduct(updated);
-      showSuccess(updated.isAvailable ? `"${p.name}" activado.` : `"${p.name}" pausado.`);
-      loadAll();
-    } catch (err: any) {
-      showError(`Error al cambiar estado: ${err.message}`);
-    }
-  };
-
   const handleDuplicate = async (p: Product) => {
     const duplicated: Product = {
       ...p,
       id: generateId('prod'),
       name: `${p.name} (Copia)`,
       sortOrder: products.length + 1,
+      isAvailable: true,
+      optionGroupIds: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -213,12 +190,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategoryFilter === 'ALL' || p.categoryId === selectedCategoryFilter;
-    const matchesAvailability =
-      availabilityFilter === 'ALL' ||
-      (availabilityFilter === 'ACTIVE' && p.isAvailable) ||
-      (availabilityFilter === 'PAUSED' && !p.isAvailable);
-
-    return matchesSearch && matchesCategory && matchesAvailability;
+    return matchesSearch && matchesCategory;
   });
 
   return (
@@ -268,7 +240,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
           gap: '6px',
           overflowX: 'auto',
           paddingBottom: '8px',
-          marginBottom: '10px',
+          marginBottom: '14px',
           scrollbarWidth: 'none'
         }}
       >
@@ -289,31 +261,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             {cat.name}
           </button>
         ))}
-      </div>
-
-      {/* Availability Filter Buttons */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-        <button
-          className={`btn btn-sm ${availabilityFilter === 'ALL' ? 'btn-secondary' : ''}`}
-          style={{ flex: 1, border: availabilityFilter === 'ALL' ? '1px solid var(--color-primary)' : '1px solid var(--color-border)', fontSize: '11px' }}
-          onClick={() => setAvailabilityFilter('ALL')}
-        >
-          Todos ({products.length})
-        </button>
-        <button
-          className={`btn btn-sm ${availabilityFilter === 'ACTIVE' ? 'btn-secondary' : ''}`}
-          style={{ flex: 1, border: availabilityFilter === 'ACTIVE' ? '1px solid #22c55e' : '1px solid var(--color-border)', fontSize: '11px', color: '#22c55e' }}
-          onClick={() => setAvailabilityFilter('ACTIVE')}
-        >
-          Activos ({products.filter(p => p.isAvailable).length})
-        </button>
-        <button
-          className={`btn btn-sm ${availabilityFilter === 'PAUSED' ? 'btn-secondary' : ''}`}
-          style={{ flex: 1, border: availabilityFilter === 'PAUSED' ? '1px solid #f59e0b' : '1px solid var(--color-border)', fontSize: '11px', color: '#f59e0b' }}
-          onClick={() => setAvailabilityFilter('PAUSED')}
-        >
-          Pausados ({products.filter(p => !p.isAvailable).length})
-        </button>
       </div>
 
       {/* Product List */}
@@ -340,8 +287,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             const mainImg = p.images && p.images.length > 0
               ? p.images[p.mainImageIndex || 0] || p.images[0]
               : null;
-            const linkedOptionsCount = p.optionGroupIds ? p.optionGroupIds.length : 0;
-
             return (
               <div
                 key={p.id}
@@ -352,8 +297,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px',
-                  opacity: p.isAvailable ? 1 : 0.75,
-                  borderLeft: p.isAvailable ? '3px solid #22c55e' : '3px solid #f59e0b'
+                  borderLeft: '3px solid var(--color-primary)'
                 }}
               >
                 {/* Main Product Info Row */}
@@ -457,16 +401,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       <span className="badge badge-info" style={{ fontSize: '9px', padding: '2px 6px' }}>
                         {category?.name || 'Sin categoría'}
                       </span>
-                      {linkedOptionsCount > 0 && (
-                        <span className="badge badge-warning" style={{ fontSize: '9px', padding: '2px 6px' }}>
-                          <Sliders size={10} /> {linkedOptionsCount} grupos extras
-                        </span>
-                      )}
-                      {!p.isAvailable && (
-                        <span className="badge badge-danger" style={{ fontSize: '9px', padding: '2px 6px' }}>
-                          Pausado
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -476,61 +410,44 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: 'flex-end',
+                    gap: '6px',
                     paddingTop: '8px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.06)'
                   }}
                 >
                   <button
-                    className={`btn btn-sm ${p.isAvailable ? 'btn-secondary' : 'btn-success'}`}
-                    style={{ padding: '4px 10px', fontSize: '11px', minHeight: '30px' }}
-                    onClick={() => handleToggleAvailability(p)}
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '4px 10px', minHeight: '32px', fontSize: '11px' }}
+                    title="Previsualizar como cliente"
+                    onClick={() => setPreviewProduct(p)}
                   >
-                    {p.isAvailable ? (
-                      <>
-                        <PauseCircle size={14} color="#f59e0b" /> Pausar
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={14} color="#fff" /> Activar
-                      </>
-                    )}
+                    <Eye size={14} /> Ver
                   </button>
-
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '4px 8px', minHeight: '30px' }}
-                      title="Previsualizar como cliente"
-                      onClick={() => setPreviewProduct(p)}
-                    >
-                      <Eye size={14} />
-                    </button>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '4px 8px', minHeight: '30px' }}
-                      title="Duplicar producto"
-                      onClick={() => handleDuplicate(p)}
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '4px 8px', minHeight: '30px' }}
-                      title="Editar producto"
-                      onClick={() => openEditModal(p)}
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      style={{ padding: '4px 8px', minHeight: '30px' }}
-                      title="Eliminar producto"
-                      onClick={() => handleDelete(p)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '4px 10px', minHeight: '32px', fontSize: '11px' }}
+                    title="Duplicar producto"
+                    onClick={() => handleDuplicate(p)}
+                  >
+                    <Copy size={14} /> Duplicar
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '4px 10px', minHeight: '32px', fontSize: '11px' }}
+                    title="Editar producto"
+                    onClick={() => openEditModal(p)}
+                  >
+                    <Edit2 size={14} /> Editar
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    style={{ padding: '4px 10px', minHeight: '32px', fontSize: '11px' }}
+                    title="Eliminar producto"
+                    onClick={() => handleDelete(p)}
+                  >
+                    <Trash2 size={14} /> Eliminar
+                  </button>
                 </div>
               </div>
             );
@@ -567,7 +484,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
 
-                {/* Base Price & Category */}
+                {/* Base Price & Category & Sort Order */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div className="form-group">
                     <label className="form-label">Precio Base ($ ARS) *</label>
@@ -600,6 +517,22 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   </div>
                 </div>
 
+                {/* Sort Order */}
+                <div className="form-group">
+                  <label className="form-label">Orden de visualización</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="Ej. 1"
+                    min="1"
+                    value={formSortOrder}
+                    onChange={e => setFormSortOrder(Number(e.target.value))}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
+                    Define la posición relativa en la carta (números más bajos aparecen primero).
+                  </span>
+                </div>
+
                 {/* Description */}
                 <div className="form-group">
                   <label className="form-label">Descripción</label>
@@ -611,26 +544,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
 
-                {/* Availability switch */}
-                <div className="form-group">
-                  <div className="switch-wrapper">
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 700 }}>Disponible para la venta</div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                        Si está pausado, los clientes verán el producto pero no podrán agregarlo al carrito.
-                      </div>
-                    </div>
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        checked={formIsAvailable}
-                        onChange={e => setFormIsAvailable(e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
-                </div>
-
                 {/* Images component */}
                 <ImageUploader
                   images={formImages}
@@ -640,59 +553,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     setFormMainImageIndex(mainIdx);
                   }}
                 />
-
-                {/* Linked Options & Extras */}
-                <div className="form-group">
-                  <label className="form-label">Opciones y Personalizaciones</label>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
-                    Seleccioná los grupos de adicionales que aplican a este producto:
-                  </div>
-
-                  {optionGroups.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', padding: '8px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' }}>
-                      No tenés grupos de opciones creados. Podés crearlos en la pestaña "Opciones".
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {optionGroups.map(og => {
-                        const isChecked = formOptionGroupIds.includes(og.id);
-                        return (
-                          <label
-                            key={og.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px',
-                              padding: '8px 12px',
-                              background: isChecked ? 'rgba(245, 158, 11, 0.1)' : 'var(--color-surface)',
-                              border: isChecked ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
-                              borderRadius: 'var(--radius-sm)',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setFormOptionGroupIds(prev => [...prev, og.id]);
-                                } else {
-                                  setFormOptionGroupIds(prev => prev.filter(id => id !== og.id));
-                                }
-                              }}
-                            />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '13px', fontWeight: 600 }}>{og.name}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                                {og.type === 'single' ? 'Opción única' : 'Múltiple'} • {og.options.length} opciones
-                              </div>
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="modal-footer">
@@ -761,12 +621,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     {previewProduct.description || 'Sin descripción'}
                   </p>
 
-                  <button
-                    className="btn btn-primary btn-block"
-                    disabled={!previewProduct.isAvailable}
-                    style={{ opacity: previewProduct.isAvailable ? 1 : 0.5 }}
-                  >
-                    {previewProduct.isAvailable ? 'Agregar al Carrito' : 'Pausado / No disponible'}
+                  <button className="btn btn-primary btn-block">
+                    Agregar al Carrito
                   </button>
                 </div>
               </div>

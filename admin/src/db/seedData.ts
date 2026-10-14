@@ -172,7 +172,7 @@ export const initialProducts: Product[] = [
     mainImageIndex: 0,
     sortOrder: 1,
     isAvailable: true,
-    optionGroupIds: ['opt_salsas'],
+    optionGroupIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -186,7 +186,7 @@ export const initialProducts: Product[] = [
     mainImageIndex: 0,
     sortOrder: 1,
     isAvailable: true,
-    optionGroupIds: ['opt_coccion', 'opt_pan', 'opt_extras_burger', 'opt_salsas'],
+    optionGroupIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -200,7 +200,7 @@ export const initialProducts: Product[] = [
     mainImageIndex: 0,
     sortOrder: 2,
     isAvailable: true,
-    optionGroupIds: ['opt_coccion', 'opt_pan', 'opt_extras_burger', 'opt_salsas'],
+    optionGroupIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -214,7 +214,7 @@ export const initialProducts: Product[] = [
     mainImageIndex: 0,
     sortOrder: 1,
     isAvailable: true,
-    optionGroupIds: ['opt_salsas'],
+    optionGroupIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -256,7 +256,7 @@ export const initialProducts: Product[] = [
     mainImageIndex: 0,
     sortOrder: 1,
     isAvailable: true,
-    optionGroupIds: ['opt_salsas'],
+    optionGroupIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },

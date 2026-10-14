@@ -34,15 +34,15 @@ on conflict (id) do update set
   is_active = excluded.is_active,
   options = excluded.options;
 
--- 3. Productos oficiales
+-- 3. Productos oficiales (sin grupos de opciones requeridos)
 insert into public.products (id, name, description, base_price, category_id, images, option_group_ids, is_available, sort_order) values
-  ('prod_promo_1', 'Combo Kaku: 2 Doble Cheddar + Papas Grandes', 'Dos hamburguesas con doble carne y doble cheddar acompañadas de una porción gigante de papas rústicas.', 31000, 'cat_promos', '[]'::jsonb, $$["opt_salsas"]$$::jsonb, true, 1),
-  ('prod_burger_1', 'Hamburguesa Doble Cheddar Bacon', 'Dos medallones de ternera de 120g, cuatro fetas de cheddar cremoso fundido y abundante panceta crocante.', 14500, 'cat_hamburguesas', '[]'::jsonb, $$["opt_coccion","opt_pan","opt_extras_burger","opt_salsas"]$$::jsonb, true, 1),
-  ('prod_burger_2', 'Hamburguesa Kaku Especial', 'Doble carne, queso provoleta crocante a la plancha, cebolla caramelizada, rúcula fresca y mayonesa ahumada.', 15800, 'cat_hamburguesas', '[]'::jsonb, $$["opt_coccion","opt_pan","opt_extras_burger","opt_salsas"]$$::jsonb, true, 2),
-  ('prod_lomito_1', 'Lomito Completo Cordobés', 'Tierno bife de lomo a la plancha, jamón cocido, queso, lechuga capuchina, tomate redondo, huevo frito y mayonesa casera en pan baguette artesanal.', 17200, 'cat_lomitos', '[]'::jsonb, $$["opt_salsas"]$$::jsonb, true, 1),
+  ('prod_promo_1', 'Combo Kaku: 2 Doble Cheddar + Papas Grandes', 'Dos hamburguesas con doble carne y doble cheddar acompañadas de una porción gigante de papas rústicas.', 31000, 'cat_promos', '[]'::jsonb, '[]'::jsonb, true, 1),
+  ('prod_burger_1', 'Hamburguesa Doble Cheddar Bacon', 'Dos medallones de ternera de 120g, cuatro fetas de cheddar cremoso fundido y abundante panceta crocante.', 14500, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 1),
+  ('prod_burger_2', 'Hamburguesa Kaku Especial', 'Doble carne, queso provoleta crocante a la plancha, cebolla caramelizada, rúcula fresca y mayonesa ahumada.', 15800, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 2),
+  ('prod_lomito_1', 'Lomito Completo Cordobés', 'Tierno bife de lomo a la plancha, jamón cocido, queso, lechuga capuchina, tomate redondo, huevo frito y mayonesa casera en pan baguette artesanal.', 17200, 'cat_lomitos', '[]'::jsonb, '[]'::jsonb, true, 1),
   ('prod_pizza_1', 'Pizza Napolitana Especial con Jamón', 'Masa madre madurada 48hs al horno, salsa de tomates italianos, abundante mozzarella, jamón cocido, rodajas de tomate y provenzal.', 15400, 'cat_pizzas', '[]'::jsonb, '[]'::jsonb, true, 1),
   ('prod_empanadas_1', 'Docena de Empanadas Criollas de Carne Cortada a Cuchillo', '12 empanadas de masa casera bien hojaldrada, carne tierna, cebollita de verdeo, pimentón dulce y comino norteño.', 14500, 'cat_empanadas', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_papas_1', 'Papas Rústicas Cheddar y Verdeo', 'Porción abundante de papas rústicas con piel, crocantes por fuera y tiernas por dentro, bañadas en queso cheddar y verdeo fresco.', 8900, 'cat_papas', '[]'::jsonb, $$["opt_salsas"]$$::jsonb, true, 1),
+  ('prod_papas_1', 'Papas Rústicas Cheddar y Verdeo', 'Porción abundante de papas rústicas con piel, crocantes por fuera y tiernas por dentro, bañadas en queso cheddar y verdeo fresco.', 8900, 'cat_papas', '[]'::jsonb, '[]'::jsonb, true, 1),
   ('prod_bebida_1', 'Cerveza Patagonia Amber Lager 730ml', 'Cerveza de sabor balanceado, con sutiles notas a caramelo y tostado. Servida helada.', 5800, 'cat_bebidas', '[]'::jsonb, '[]'::jsonb, true, 1),
   ('prod_postre_1', 'Volcán Tibio de Chocolate con Helado', 'Bizcochuelo tibio relleno de chocolate belga fundido, acompañado con una bocha de helado de crema americana artesanal.', 6500, 'cat_postres', '[]'::jsonb, '[]'::jsonb, true, 1)
 on conflict (id) do update set

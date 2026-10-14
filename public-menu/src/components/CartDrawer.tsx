@@ -67,6 +67,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       return;
     }
 
+    // Verify that none of the items in the cart are paused/unavailable
+    if (menuData && menuData.products) {
+      const activeProductIds = new Set(menuData.products.filter(p => p.isAvailable).map(p => p.id));
+      const unavailable = items.find(it => !activeProductIds.has(it.productId));
+      if (unavailable) {
+        setValidationError(`El producto "${unavailable.productName}" ya no está disponible para la venta. Eliminalo del carrito para continuar.`);
+        return;
+      }
+    }
+
     if (!customerName.trim()) {
       setValidationError('Por favor ingresá tu nombre para que podamos identificar tu pedido.');
       return;
@@ -368,7 +378,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ej. Ricardo Torres"
+                    placeholder="Ej. Rodrigo Guzman"
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
                     required
@@ -381,7 +391,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Ej. Silvana Gaun"
+                      placeholder="Ej.  Casa de curi"
                       value={address}
                       onChange={e => setAddress(e.target.value)}
                       required
