@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-16T20:41:52.921Z",
+  "generatedAt": "2026-10-16T21:25:51.208Z",
   "business": {
     "name": "El Kaku",
     "menuTitle": "Carta Digital El Kaku",
@@ -56,71 +56,81 @@
       "id": "prod_mv98ikeq_nc30u",
       "name": "X2 HAMBURGUESAS SIMPLE",
       "description": "CARNE + LECHUGA + TOMATE + JAMON + QUESO + HUEVO + MAYO CASERA Y PAPAS FRITAS",
-      "basePrice": 9000,
+      "price": 9000,
       "categoryId": "cat_promos",
+      "isAvailable": true,
+      "isFeatured": false,
       "images": [
         "./images/prod_prod_mv98ikeq_nc30u_0.jpg"
       ],
-      "mainImageIndex": 0,
-      "sortOrder": 1,
-      "isAvailable": true,
-      "optionGroupIds": []
+      "allergens": [],
+      "labels": [],
+      "optionGroupIds": [],
+      "sortOrder": 1
     },
     {
       "id": "prod_mv8mtbpn_1to0t",
       "name": "Hamburguesa simple COMPLETA",
       "description": "CARNE + LECHUGA + TOMATE + JAMON + QUESO + HUEVO + MAYO CASERA Y PAPAS FRITAS",
-      "basePrice": 5000,
+      "price": 5000,
       "categoryId": "cat_hamburguesas",
+      "isAvailable": true,
+      "isFeatured": false,
       "images": [
         "./images/prod_prod_mv8mtbpn_1to0t_0.jpg"
       ],
-      "mainImageIndex": 0,
-      "sortOrder": 2,
-      "isAvailable": true,
-      "optionGroupIds": []
+      "allergens": [],
+      "labels": [],
+      "optionGroupIds": [],
+      "sortOrder": 2
     },
     {
       "id": "prod_mv8mxfys_yn8uz",
       "name": "Hamburguesa DOBLE COMPLETA",
       "description": "X2 CARNE + LECHUGA + TOMATE + JAMON + QUESO + HUEVO + MAYO CASERA Y PAPAS FRITAS",
-      "basePrice": 6000,
+      "price": 6000,
       "categoryId": "cat_hamburguesas",
+      "isAvailable": true,
+      "isFeatured": false,
       "images": [
         "./images/prod_prod_mv8mxfys_yn8uz_0.jpg"
       ],
-      "mainImageIndex": 0,
-      "sortOrder": 3,
-      "isAvailable": true,
-      "optionGroupIds": []
+      "allergens": [],
+      "labels": [],
+      "optionGroupIds": [],
+      "sortOrder": 3
     },
     {
       "id": "prod_mv8mufoq_k8a8x",
       "name": "Hamburguesa Doble TODO",
       "description": "X2 CARNE + LECHUGA + TOMATE +X2 JAMON + X2 QUESO + X2 HUEVO + MAYO CASERA Y PAPAS FRITAS",
-      "basePrice": 7000,
+      "price": 7000,
       "categoryId": "cat_hamburguesas",
+      "isAvailable": true,
+      "isFeatured": false,
       "images": [
         "./images/prod_prod_mv8mufoq_k8a8x_0.jpg"
       ],
-      "mainImageIndex": 0,
-      "sortOrder": 4,
-      "isAvailable": true,
-      "optionGroupIds": []
+      "allergens": [],
+      "labels": [],
+      "optionGroupIds": [],
+      "sortOrder": 4
     },
     {
       "id": "prod_mv8n35i7_ci3qh",
       "name": "LOMITO CON PAPAS",
       "description": "MAYO CASERA\nLECHUGA\nTOMATE\nJAMON\nCARNE DE FILET\nQUESO\nHUEVO\nPAN CASERO\n\nPAPAS FRTIAS",
-      "basePrice": 10000,
+      "price": 10000,
       "categoryId": "cat_lomitos",
+      "isAvailable": true,
+      "isFeatured": false,
       "images": [
         "./images/prod_prod_mv8n35i7_ci3qh_0.jpg"
       ],
-      "mainImageIndex": 0,
-      "sortOrder": 5,
-      "isAvailable": true,
-      "optionGroupIds": []
+      "allergens": [],
+      "labels": [],
+      "optionGroupIds": [],
+      "sortOrder": 5
     }
   ],
   "optionGroups": []
