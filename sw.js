@@ -1,4 +1,5 @@
-const CACHE_NAME = 'kaku-pwa-cache-v5';
+const CACHE_NAME = 'kaku-pwa-cache-v6';
+
 
 const PRECACHE_ASSETS = [
   './',
