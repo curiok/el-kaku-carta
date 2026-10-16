@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kaku-pwa-cache-v6';
+const CACHE_NAME = 'kaku-pwa-cache-v7';
 
 
 const PRECACHE_ASSETS = [
