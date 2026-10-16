@@ -60,6 +60,9 @@ export async function buildStaticMenuBundle(publicPayload) {
     });
   }
 
+  const categoriesWithProducts = activeCategories.filter(c => activeProducts.some(p => p.categoryId === c.id));
+  const publicCategories = categoriesWithProducts.length > 0 ? categoriesWithProducts : activeCategories;
+
   // 3. Construir data/menu.json público y limpio (CERO datos privados ni contraseñas)
   const isFreeDelivery = (business?.deliveryFeeMode ?? 'free') === 'free';
   const publicMenuData = {
@@ -85,10 +88,11 @@ export async function buildStaticMenuBundle(publicPayload) {
         accent: '#D93620'
       }
     },
-    categories: activeCategories,
+    categories: publicCategories,
     products: processedProducts,
     optionGroups: relevantOptionGroups
   };
+
 
   const menuJsonContent = JSON.stringify(publicMenuData, null, 2);
   filesMap.set('data/menu.json', {

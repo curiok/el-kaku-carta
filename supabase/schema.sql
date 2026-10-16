@@ -200,17 +200,13 @@ on conflict (id) do update set
   is_active = excluded.is_active,
   options = excluded.options;
 
--- 4. Productos oficiales (sin grupos de opciones requeridos)
+-- 4. Productos oficiales
 insert into public.products (id, name, description, base_price, category_id, images, option_group_ids, is_available, sort_order) values
-  ('prod_promo_1', 'Combo Kaku: 2 Doble Cheddar + Papas Grandes', 'Dos hamburguesas con doble carne y doble cheddar acompañadas de una porción gigante de papas rústicas.', 31000, 'cat_promos', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_burger_1', 'Hamburguesa Doble Cheddar Bacon', 'Dos medallones de ternera de 120g, cuatro fetas de cheddar cremoso fundido y abundante panceta crocante.', 14500, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_burger_2', 'Hamburguesa Kaku Especial', 'Doble carne, queso provoleta crocante a la plancha, cebolla caramelizada, rúcula fresca y mayonesa ahumada.', 15800, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 2),
-  ('prod_lomito_1', 'Lomito Completo Cordobés', 'Tierno bife de lomo a la plancha, jamón cocido, queso, lechuga capuchina, tomate redondo, huevo frito y mayonesa casera en pan baguette artesanal.', 17200, 'cat_lomitos', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_pizza_1', 'Pizza Napolitana Especial con Jamón', 'Masa madre madurada 48hs al horno, salsa de tomates italianos, abundante mozzarella, jamón cocido, rodajas de tomate y provenzal.', 15400, 'cat_pizzas', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_empanadas_1', 'Docena de Empanadas Criollas de Carne Cortada a Cuchillo', '12 empanadas de masa casera bien hojaldrada, carne tierna, cebollita de verdeo, pimentón dulce y comino norteño.', 14500, 'cat_empanadas', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_papas_1', 'Papas Rústicas Cheddar y Verdeo', 'Porción abundante de papas rústicas con piel, crocantes por fuera y tiernas por dentro, bañadas en queso cheddar y verdeo fresco.', 8900, 'cat_papas', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_bebida_1', 'Cerveza Patagonia Amber Lager 730ml', 'Cerveza de sabor balanceado, con sutiles notas a caramelo y tostado. Servida helada.', 5800, 'cat_bebidas', '[]'::jsonb, '[]'::jsonb, true, 1),
-  ('prod_postre_1', 'Volcán Tibio de Chocolate con Helado', 'Bizcochuelo tibio relleno de chocolate belga fundido, acompañado con una bocha de helado de crema americana artesanal.', 6500, 'cat_postres', '[]'::jsonb, '[]'::jsonb, true, 1)
+  ('prod_mv98ikeq_nc30u', 'X2 HAMBURGUESAS SIMPLE', '', 9000, 'cat_promos', '[]'::jsonb, '[]'::jsonb, true, 1),
+  ('prod_mv8mtbpn_1to0t', 'Hamburguesa simple COMPLETA', '', 5000, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 2),
+  ('prod_mv8mxfys_yn8uz', 'Hamburguesa DOBLE COMPLETA', '', 6000, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 3),
+  ('prod_mv8mufoq_k8a8x', 'Hamburguesa Doble TODO', '', 7000, 'cat_hamburguesas', '[]'::jsonb, '[]'::jsonb, true, 4),
+  ('prod_mv8n35i7_ci3qh', 'LOMITO CON PAPAS', '', 10000, 'cat_lomitos', '[]'::jsonb, '[]'::jsonb, true, 5)
 on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,
@@ -220,3 +216,4 @@ on conflict (id) do update set
   option_group_ids = excluded.option_group_ids,
   is_available = excluded.is_available,
   sort_order = excluded.sort_order;
+

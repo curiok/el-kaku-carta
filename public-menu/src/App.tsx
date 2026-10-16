@@ -12,7 +12,7 @@ import {
 import { CartProvider, useCart } from './context/CartContext';
 import { CartDrawer } from './components/CartDrawer';
 import { Lightbox } from './components/Lightbox';
-import { fetchLiveMenuData } from './supabase';
+import { fetchLiveMenuData, subscribeToMenuUpdates } from './supabase';
 import { formatCurrency } from './utils/formatters';
 import type { PublicMenuData, Product, Category } from './types';
 import './styles/menu.css';
@@ -36,32 +36,41 @@ function PublicMenuInner() {
 
   const { items, addItem, totalItemsCount, subtotal } = useCart();
 
-  useEffect(() => {
-    async function loadMenu() {
-      try {
-        // 1. Try real-time Supabase first for instantaneous multi-device sync
-        const liveData = await fetchLiveMenuData();
-        if (liveData && liveData.categories.length > 0) {
-          setMenuData(liveData);
-          setLoading(false);
-          return;
-        }
-
-        // 2. Seamless fallback to static data/menu.json (offline resilient)
-        const res = await fetch('./data/menu.json', { cache: 'no-cache' });
-        if (!res.ok) {
-          throw new Error(`No se pudo cargar la carta digital (HTTP ${res.status})`);
-        }
-        const data: PublicMenuData = await res.json();
-        setMenuData(data);
-      } catch (err: any) {
-        setError(err.message || 'Error al conectar con la carta digital.');
-      } finally {
+  const loadMenu = async () => {
+    try {
+      // 1. Try real-time Supabase first for instantaneous multi-device sync
+      const liveData = await fetchLiveMenuData();
+      if (liveData && liveData.categories.length > 0) {
+        setMenuData(liveData);
         setLoading(false);
+        return;
       }
+
+      // 2. Seamless fallback to static data/menu.json (offline resilient)
+      const res = await fetch('./data/menu.json', { cache: 'no-cache' });
+      if (!res.ok) {
+        throw new Error(`No se pudo cargar la carta digital (HTTP ${res.status})`);
+      }
+      const data: PublicMenuData = await res.json();
+      setMenuData(data);
+    } catch (err: any) {
+      setError(err.message || 'Error al conectar con la carta digital.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadMenu();
+    // Real-time synchronization across devices (cellphones, tablets, PCs)
+    const unsubscribe = subscribeToMenuUpdates(() => {
+      loadMenu();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, []);
+
 
   const handleQuickAdd = (product: Product) => {
     if (!product || !product.isAvailable) return;
@@ -110,16 +119,21 @@ function PublicMenuInner() {
   }
 
   const business = menuData.business;
-  const categories = menuData.categories.filter(c => c.isActive);
   const products = menuData.products.filter(p => p.isAvailable);
+  const activeCategoryIds = new Set(products.map(p => p.categoryId));
+  const categories = menuData.categories.filter(c => c.isActive && activeCategoryIds.has(c.id));
+  const currentCategoryId = selectedCategoryId === 'ALL' || activeCategoryIds.has(selectedCategoryId)
+    ? selectedCategoryId
+    : 'ALL';
 
   // Filter products
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat = selectedCategoryId === 'ALL' || p.categoryId === selectedCategoryId;
+    const matchesCat = currentCategoryId === 'ALL' || p.categoryId === currentCategoryId;
     return matchesSearch && matchesCat;
   });
+
 
   return (
     <div className="menu-app">
@@ -222,7 +236,7 @@ function PublicMenuInner() {
       {/* Category Pills Bar */}
       <nav className="category-pills">
         <button
-          className={`cat-pill ${selectedCategoryId === 'ALL' ? 'active' : ''}`}
+          className={`cat-pill ${currentCategoryId === 'ALL' ? 'active' : ''}`}
           onClick={() => setSelectedCategoryId('ALL')}
         >
           Todas
@@ -230,13 +244,14 @@ function PublicMenuInner() {
         {categories.map(cat => (
           <button
             key={cat.id}
-            className={`cat-pill ${selectedCategoryId === cat.id ? 'active' : ''}`}
+            className={`cat-pill ${currentCategoryId === cat.id ? 'active' : ''}`}
             onClick={() => setSelectedCategoryId(cat.id)}
           >
             {cat.name}
           </button>
         ))}
       </nav>
+
 
       {/* Product Catalog */}
       <main className="catalog-content">

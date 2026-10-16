@@ -148,144 +148,76 @@ export const initialOptionGroups: OptionGroup[] = [
   }
 ];
 
-function createPlaceholderSvg(title: string, color: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
-    <rect width="600" height="400" fill="${color}"/>
-    <circle cx="300" cy="180" r="70" fill="rgba(255,255,255,0.15)"/>
-    <path d="M260 185 C260 160, 340 160, 340 185 Z" fill="#ffffff" opacity="0.9"/>
-    <rect x="250" y="195" width="100" height="14" rx="4" fill="#fbbf24"/>
-    <path d="M255 215 C255 230, 345 230, 345 215 Z" fill="#ffffff" opacity="0.9"/>
-    <text x="300" y="310" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">${title}</text>
-    <text x="300" y="345" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="rgba(255,255,255,0.8)" text-anchor="middle">El Kaku — Gastronomía</text>
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 export const initialProducts: Product[] = [
   {
-    id: 'prod_promo_1',
-    name: 'Combo Kaku: 2 Doble Cheddar + Papas Grandes',
-    description: 'Dos hamburguesas con doble carne y doble cheddar acompañadas de una porción gigante de papas rústicas.',
-    basePrice: 31000,
+    id: 'prod_mv98ikeq_nc30u',
+    name: 'X2 HAMBURGUESAS SIMPLE',
+    description: '',
+    basePrice: 9000,
     categoryId: 'cat_promos',
-    images: [createPlaceholderSvg('Combo 2 Burgers + Papas', '#b45309')],
+    images: [],
     mainImageIndex: 0,
     sortOrder: 1,
     isAvailable: true,
     optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: '2026-10-16T03:10:00.000Z',
+    updatedAt: '2026-10-16T03:10:00.000Z'
   },
   {
-    id: 'prod_burger_1',
-    name: 'Hamburguesa Doble Cheddar Bacon',
-    description: 'Dos medallones de ternera de 120g, cuatro fetas de cheddar cremoso fundido y abundante panceta crocante.',
-    basePrice: 14500,
+    id: 'prod_mv8mtbpn_1to0t',
+    name: 'Hamburguesa simple COMPLETA',
+    description: '',
+    basePrice: 5000,
     categoryId: 'cat_hamburguesas',
-    images: [createPlaceholderSvg('Doble Cheddar Bacon', '#dc2626')],
-    mainImageIndex: 0,
-    sortOrder: 1,
-    isAvailable: true,
-    optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'prod_burger_2',
-    name: 'Hamburguesa Kaku Especial',
-    description: 'Doble carne, queso provoleta crocante a la plancha, cebolla caramelizada, rúcula fresca y mayonesa ahumada.',
-    basePrice: 15800,
-    categoryId: 'cat_hamburguesas',
-    images: [createPlaceholderSvg('Hamburguesa Kaku Especial', '#ea580c')],
+    images: [],
     mainImageIndex: 0,
     sortOrder: 2,
     isAvailable: true,
     optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: '2026-10-16T03:10:00.000Z',
+    updatedAt: '2026-10-16T03:10:00.000Z'
   },
   {
-    id: 'prod_lomito_1',
-    name: 'Lomito Completo Cordobés',
-    description: 'Tierno bife de lomo a la plancha, jamón cocido, queso, lechuga capuchina, tomate redondo, huevo frito y mayonesa casera en pan baguette artesanal.',
-    basePrice: 17200,
+    id: 'prod_mv8mxfys_yn8uz',
+    name: 'Hamburguesa DOBLE COMPLETA',
+    description: '',
+    basePrice: 6000,
+    categoryId: 'cat_hamburguesas',
+    images: [],
+    mainImageIndex: 0,
+    sortOrder: 3,
+    isAvailable: true,
+    optionGroupIds: [],
+    createdAt: '2026-10-16T03:10:00.000Z',
+    updatedAt: '2026-10-16T03:10:00.000Z'
+  },
+  {
+    id: 'prod_mv8mufoq_k8a8x',
+    name: 'Hamburguesa Doble TODO',
+    description: '',
+    basePrice: 7000,
+    categoryId: 'cat_hamburguesas',
+    images: [],
+    mainImageIndex: 0,
+    sortOrder: 4,
+    isAvailable: true,
+    optionGroupIds: [],
+    createdAt: '2026-10-16T03:10:00.000Z',
+    updatedAt: '2026-10-16T03:10:00.000Z'
+  },
+  {
+    id: 'prod_mv8n35i7_ci3qh',
+    name: 'LOMITO CON PAPAS',
+    description: '',
+    basePrice: 10000,
     categoryId: 'cat_lomitos',
-    images: [createPlaceholderSvg('Lomito Completo Cordobés', '#7c2d12')],
+    images: [],
     mainImageIndex: 0,
-    sortOrder: 1,
+    sortOrder: 5,
     isAvailable: true,
     optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'prod_pizza_1',
-    name: 'Pizza Napolitana Especial con Jamón',
-    description: 'Masa madre madurada 48hs al horno, salsa de tomates italianos, abundante mozzarella, jamón cocido, rodajas de tomate y provenzal.',
-    basePrice: 15400,
-    categoryId: 'cat_pizzas',
-    images: [createPlaceholderSvg('Pizza Napolitana Especial', '#c2410c')],
-    mainImageIndex: 0,
-    sortOrder: 1,
-    isAvailable: true,
-    optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'prod_empanadas_1',
-    name: 'Docena de Empanadas Criollas de Carne Cortada a Cuchillo',
-    description: '12 empanadas de masa casera bien hojaldrada, carne tierna, cebollita de verdeo, pimentón dulce y comino norteño.',
-    basePrice: 14500,
-    categoryId: 'cat_empanadas',
-    images: [createPlaceholderSvg('Empanadas Criollas x12', '#d97706')],
-    mainImageIndex: 0,
-    sortOrder: 1,
-    isAvailable: true,
-    optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'prod_papas_1',
-    name: 'Papas Rústicas Cheddar y Verdeo',
-    description: 'Porción abundante de papas rústicas con piel, crocantes por fuera y tiernas por dentro, bañadas en queso cheddar y verdeo fresco.',
-    basePrice: 8900,
-    categoryId: 'cat_papas',
-    images: [createPlaceholderSvg('Papas Rústicas con Cheddar', '#eab308')],
-    mainImageIndex: 0,
-    sortOrder: 1,
-    isAvailable: true,
-    optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'prod_bebida_1',
-    name: 'Cerveza Patagonia Amber Lager 730ml',
-    description: 'Cerveza de sabor balanceado, con sutiles notas a caramelo y tostado. Servida helada.',
-    basePrice: 5800,
-    categoryId: 'cat_bebidas',
-    images: [createPlaceholderSvg('Patagonia Amber Lager', '#0f766e')],
-    mainImageIndex: 0,
-    sortOrder: 1,
-    isAvailable: true,
-    optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'prod_postre_1',
-    name: 'Volcán Tibio de Chocolate con Helado',
-    description: 'Bizcochuelo tibio relleno de chocolate belga fundido, acompañado con una bocha de helado de crema americana artesanal.',
-    basePrice: 6500,
-    categoryId: 'cat_postres',
-    images: [createPlaceholderSvg('Volcán de Chocolate', '#4c1d95')],
-    mainImageIndex: 0,
-    sortOrder: 1,
-    isAvailable: true,
-    optionGroupIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: '2026-10-16T03:10:00.000Z',
+    updatedAt: '2026-10-16T03:10:00.000Z'
   }
 ];
+

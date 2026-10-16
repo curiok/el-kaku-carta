@@ -31,7 +31,7 @@ export async function fetchLiveMenuData(): Promise<PublicMenuData | null> {
       return null;
     }
 
-    const categories: Category[] = catsRes.data.map(c => ({
+    const allCategories: Category[] = catsRes.data.map(c => ({
       id: c.id,
       name: c.name,
       description: c.description || '',
@@ -51,6 +51,10 @@ export async function fetchLiveMenuData(): Promise<PublicMenuData | null> {
       isAvailable: p.is_available,
       sortOrder: p.sort_order
     }));
+
+    // Only present categories that contain at least one available product
+    const availableCategoryIds = new Set(products.map(p => p.categoryId));
+    const categories = allCategories.filter(c => availableCategoryIds.has(c.id));
 
     const optionGroups: OptionGroup[] = optsRes.data.map(o => ({
       id: o.id,
@@ -100,3 +104,52 @@ export async function fetchLiveMenuData(): Promise<PublicMenuData | null> {
     return null;
   }
 }
+
+/**
+ * Checks in real-time whether specific products are currently available in Supabase.
+ */
+export async function checkProductsAvailability(productIds: string[]): Promise<Record<string, boolean>> {
+  if (!productIds || productIds.length === 0) return {};
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, is_available')
+      .in('id', productIds);
+
+    if (error || !data) return {};
+    const result: Record<string, boolean> = {};
+    for (const row of data) {
+      result[row.id] = Boolean(row.is_available);
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Subscribes to real-time changes on products, categories and business_settings.
+ */
+export function subscribeToMenuUpdates(onUpdate: () => void): () => void {
+  try {
+    const channel = supabase
+      .channel('kaku-menu-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        onUpdate();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        onUpdate();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'business_settings' }, () => {
+        onUpdate();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch {
+    return () => {};
+  }
+}
+

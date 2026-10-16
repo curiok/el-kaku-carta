@@ -1,4 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { supabase } from '../supabaseClient';
 import type {
   Category,
   Product,
@@ -16,6 +17,7 @@ import {
   initialSettings
 } from './seedData';
 import { generateSalt, hashPassword, verifyPassword } from '../utils/crypto';
+
 
 interface KakuDBSchema extends DBSchema {
   categories: {
@@ -140,6 +142,39 @@ export async function getDB(): Promise<IDBPDatabase<KakuDBSchema>> {
 /* ------------------- Categories ------------------- */
 export async function getCategories(): Promise<Category[]> {
   const db = await getDB();
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (!error && Array.isArray(data)) {
+      const cats: Category[] = data.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description || '',
+        sortOrder: c.sort_order,
+        isActive: c.is_active
+      }));
+
+      // Cache into local IndexedDB
+      try {
+        const tx = db.transaction('categories', 'readwrite');
+        await tx.objectStore('categories').clear();
+        for (const cat of cats) {
+          await tx.objectStore('categories').put(cat);
+        }
+        await tx.done;
+      } catch (cacheErr) {
+        console.warn('Could not cache categories to IndexedDB:', cacheErr);
+      }
+
+      return cats;
+    }
+  } catch (err) {
+    console.warn('Supabase getCategories failed, falling back to IndexedDB:', err);
+  }
+
   const all = await db.getAll('categories');
   return all.sort((a, b) => a.sortOrder - b.sortOrder);
 }
@@ -147,6 +182,20 @@ export async function getCategories(): Promise<Category[]> {
 export async function saveCategory(category: Category): Promise<void> {
   const db = await getDB();
   await db.put('categories', category);
+
+  try {
+    const row = {
+      id: category.id,
+      name: category.name,
+      description: category.description || '',
+      sort_order: category.sortOrder,
+      is_active: category.isActive,
+      updated_at: new Date().toISOString()
+    };
+    await supabase.from('categories').upsert([row], { onConflict: 'id' });
+  } catch (err) {
+    console.error('Error saving category to Supabase:', err);
+  }
 }
 
 export async function deleteCategory(id: string): Promise<{ success: boolean; reason?: string }> {
@@ -160,12 +209,58 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; re
     };
   }
   await db.delete('categories', id);
+
+  try {
+    await supabase.from('categories').delete().eq('id', id);
+  } catch (err) {
+    console.error('Error deleting category from Supabase:', err);
+  }
   return { success: true };
 }
 
 /* ------------------- Products ------------------- */
 export async function getProducts(): Promise<Product[]> {
   const db = await getDB();
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (!error && Array.isArray(data)) {
+      const prods: Product[] = data.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        basePrice: Number(p.base_price) || 0,
+        categoryId: p.category_id,
+        images: Array.isArray(p.images) ? p.images : [],
+        mainImageIndex: p.main_image_index || 0,
+        sortOrder: p.sort_order,
+        isAvailable: p.is_available ?? true,
+        optionGroupIds: Array.isArray(p.option_group_ids) ? p.option_group_ids : [],
+        createdAt: p.created_at || new Date().toISOString(),
+        updatedAt: p.updated_at || new Date().toISOString()
+      }));
+
+      // Cache into local IndexedDB and purge any deleted products
+      try {
+        const tx = db.transaction('products', 'readwrite');
+        await tx.objectStore('products').clear();
+        for (const pr of prods) {
+          await tx.objectStore('products').put(pr);
+        }
+        await tx.done;
+      } catch (cacheErr) {
+        console.warn('Could not cache products to IndexedDB:', cacheErr);
+      }
+
+      return prods;
+    }
+  } catch (err) {
+    console.warn('Supabase getProducts failed, falling back to IndexedDB:', err);
+  }
+
   const all = await db.getAll('products');
   return all.sort((a, b) => a.sortOrder - b.sortOrder);
 }
@@ -173,12 +268,72 @@ export async function getProducts(): Promise<Product[]> {
 export async function saveProduct(product: Product): Promise<void> {
   const db = await getDB();
   await db.put('products', product);
+
+  try {
+    const row = {
+      id: product.id,
+      name: product.name,
+      description: product.description || '',
+      base_price: product.basePrice,
+      category_id: product.categoryId,
+      images: product.images || [],
+      main_image_index: product.mainImageIndex || 0,
+      option_group_ids: product.optionGroupIds || [],
+      is_available: product.isAvailable ?? true,
+      sort_order: product.sortOrder,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('products').upsert([row], { onConflict: 'id' });
+    if (error) {
+      console.error('Error saving product to Supabase:', error);
+    }
+  } catch (err) {
+    console.error('Failed to sync saveProduct to Supabase:', err);
+  }
+}
+
+export async function toggleProductAvailability(id: string, isAvailable: boolean): Promise<void> {
+  const db = await getDB();
+  const existing = await db.get('products', id);
+  if (existing) {
+    existing.isAvailable = isAvailable;
+    existing.updatedAt = new Date().toISOString();
+    await db.put('products', existing);
+  }
+
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        is_available: isAvailable,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating product availability in Supabase:', error);
+      throw error;
+    }
+  } catch (err) {
+    console.error('Failed to update availability in Supabase:', err);
+    throw err;
+  }
 }
 
 export async function deleteProduct(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('products', id);
+
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting product from Supabase:', error);
+    }
+  } catch (err) {
+    console.error('Failed to delete product from Supabase:', err);
+  }
 }
+
 
 /* ------------------- Option Groups ------------------- */
 export async function getOptionGroups(): Promise<OptionGroup[]> {
@@ -199,6 +354,47 @@ export async function deleteOptionGroup(id: string): Promise<void> {
 /* ------------------- Settings ------------------- */
 export async function getSettings(): Promise<BusinessSettings> {
   const db = await getDB();
+  try {
+    const { data, error } = await supabase
+      .from('business_settings')
+      .select('*')
+      .eq('id', 'business_settings')
+      .maybeSingle();
+
+    if (!error && data) {
+      const isFree = (data.delivery_fee_mode ?? 'free') === 'free';
+      const sett: BusinessSettings = {
+        businessName: data.business_name || 'El Kaku',
+        menuTitle: data.menu_title || 'Carta Digital El Kaku',
+        whatsappNumber: data.whatsapp_number || '+54 9 3821 40-6662',
+        currencySymbol: data.currency_symbol || '$',
+        currencyFormat: data.currency_format || 'es-AR',
+        deliveryEnabled: data.delivery_enabled ?? true,
+        pickupEnabled: data.pickup_enabled ?? true,
+        deliveryFeeMode: isFree ? 'free' : 'paid',
+        deliveryFee: isFree ? 0 : (Number(data.delivery_fee) || 0),
+        welcomeText: data.welcome_text || '',
+        contactText: data.contact_text || '',
+        theme: data.theme || initialSettings.theme,
+        github: data.github || {
+          repo: 'curiok/el-kaku-carta',
+          branch: 'gh-pages',
+          publicUrl: 'https://curiok.github.io/el-kaku-carta/'
+        }
+      };
+
+      try {
+        await db.put('settings', { ...sett, id: SETTINGS_KEY });
+      } catch (cacheErr) {
+        console.warn('Could not cache settings to IndexedDB:', cacheErr);
+      }
+
+      return sett;
+    }
+  } catch (err) {
+    console.warn('Supabase getSettings failed, using IndexedDB fallback:', err);
+  }
+
   const found = await db.get('settings', SETTINGS_KEY);
   if (!found) {
     const s = { ...initialSettings, id: SETTINGS_KEY };
@@ -232,11 +428,77 @@ export async function getSettings(): Promise<BusinessSettings> {
 export async function saveSettings(settings: BusinessSettings): Promise<void> {
   const db = await getDB();
   await db.put('settings', { ...settings, id: SETTINGS_KEY });
+
+  try {
+    const isFree = (settings.deliveryFeeMode ?? 'free') === 'free';
+    const row = {
+      id: 'business_settings',
+      business_name: settings.businessName,
+      menu_title: settings.menuTitle,
+      whatsapp_number: settings.whatsappNumber,
+      currency_symbol: settings.currencySymbol,
+      currency_format: settings.currencyFormat,
+      delivery_enabled: settings.deliveryEnabled,
+      pickup_enabled: settings.pickupEnabled,
+      delivery_fee_mode: isFree ? 'free' : 'paid',
+      delivery_fee: isFree ? 0 : (Number(settings.deliveryFee) || 0),
+      welcome_text: settings.welcomeText || '',
+      contact_text: settings.contactText || '',
+      theme: settings.theme,
+      github: {
+        repo: 'curiok/el-kaku-carta',
+        branch: 'gh-pages',
+        publicUrl: 'https://curiok.github.io/el-kaku-carta/'
+      },
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('business_settings').upsert([row], { onConflict: 'id' });
+    if (error) {
+      console.error('Error saving settings to Supabase:', error);
+    }
+  } catch (err) {
+    console.error('Failed to sync saveSettings to Supabase:', err);
+  }
 }
 
 /* ------------------- Orders ------------------- */
 export async function getOrders(): Promise<LocalOrder[]> {
   const db = await getDB();
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      const orders: LocalOrder[] = data.map(o => ({
+        id: o.id,
+        createdAt: o.created_at,
+        customerName: o.customer_name,
+        deliveryType: o.delivery_type,
+        address: o.address || undefined,
+        items: o.items || [],
+        subtotal: Number(o.subtotal) || 0,
+        deliveryFee: Number(o.delivery_fee) || 0,
+        total: Number(o.total) || 0,
+        notes: o.notes || undefined,
+        status: (o.status === 'pending' ? 'abierto_whatsapp' : o.status) as OrderStatus
+      }));
+
+      try {
+        const tx = db.transaction('local_orders', 'readwrite');
+        for (const ord of orders) {
+          await tx.objectStore('local_orders').put(ord);
+        }
+        await tx.done;
+      } catch {}
+
+      return orders;
+    }
+  } catch (err) {
+    console.warn('Supabase getOrders failed, fallback to IndexedDB:', err);
+  }
+
   const orders = await db.getAll('local_orders');
   // Sort descending by creation date (newest first)
   return orders.sort(
@@ -247,6 +509,25 @@ export async function getOrders(): Promise<LocalOrder[]> {
 export async function saveOrder(order: LocalOrder): Promise<void> {
   const db = await getDB();
   await db.put('local_orders', order);
+
+  try {
+    const sbStatus = order.status === 'abierto_whatsapp' ? 'pending' : order.status;
+    const row = {
+      id: order.id,
+      customer_name: order.customerName,
+      delivery_type: order.deliveryType,
+      address: order.address || null,
+      items: order.items || [],
+      subtotal: order.subtotal,
+      delivery_fee: order.deliveryFee,
+      total: order.total,
+      status: sbStatus,
+      updated_at: new Date().toISOString()
+    };
+    await supabase.from('orders').upsert([row], { onConflict: 'id' });
+  } catch (err) {
+    console.error('Error saving order to Supabase:', err);
+  }
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
@@ -256,12 +537,29 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
     order.status = status;
     await db.put('local_orders', order);
   }
+
+  try {
+    const sbStatus = status === 'abierto_whatsapp' ? 'pending' : status;
+    await supabase.from('orders').update({
+      status: sbStatus,
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
+  } catch (err) {
+    console.error('Error updating order status in Supabase:', err);
+  }
 }
 
 export async function deleteOrder(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('local_orders', id);
+
+  try {
+    await supabase.from('orders').delete().eq('id', id);
+  } catch (err) {
+    console.error('Error deleting order from Supabase:', err);
+  }
 }
+
 
 /* ------------------- Backup & Restore ------------------- */
 export async function exportBackupData(): Promise<BackupData> {

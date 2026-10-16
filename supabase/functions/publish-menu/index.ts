@@ -118,6 +118,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // 3. Generar data/menu.json limpio
+    const categoriesWithProducts = activeCategories.filter((c: any) => activeProducts.some((p: any) => p.categoryId === c.id));
+    const publicCategories = categoriesWithProducts.length > 0 ? categoriesWithProducts : activeCategories;
+
     const isFreeDelivery = (business?.deliveryFeeMode ?? 'free') === 'free';
     const publicMenuData = {
       version: '1.0.0',
@@ -142,10 +145,11 @@ Deno.serve(async (req: Request) => {
           accent: '#D93620'
         }
       },
-      categories: activeCategories,
+      categories: publicCategories,
       products: processedProducts,
       optionGroups: relevantOptionGroups
     };
+
 
     const menuJsonString = JSON.stringify(publicMenuData, null, 2);
     const menuBytes = new TextEncoder().encode(menuJsonString);

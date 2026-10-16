@@ -553,12 +553,12 @@ describe('9. Aislamiento y Configuración PWA de El Kaku Admin en iPhone', () =>
 
     assert.ok(adminSw.includes('admin.html'), 'SW de admin debe proteger admin.html');
     assert.ok(menuSw.includes('admin.html'), 'SW del menú debe proteger admin.html');
-    assert.ok(adminSw.includes('kaku-pwa-cache-v5'), 'Debe tener versión de caché v5');
-    assert.ok(menuSw.includes('kaku-pwa-cache-v5'), 'Debe tener versión de caché v5');
+    assert.ok(adminSw.includes('kaku-pwa-cache-v6'), 'Debe tener versión de caché v6');
+    assert.ok(menuSw.includes('kaku-pwa-cache-v6'), 'Debe tener versión de caché v6');
   });
 });
 
-describe('10. Productos sin Opciones y sin Controles de Pausado en Formulario', () => {
+describe('10. Control de Disponibilidad y Pausa/Reactivación de Productos', () => {
   const sampleProduct = {
     id: 'prod_test_available',
     name: 'Hamburguesa Test Directa',
@@ -581,17 +581,17 @@ describe('10. Productos sin Opciones y sin Controles de Pausado en Formulario', 
     assert.deepEqual(sampleProduct.optionGroupIds, [], 'El producto no debe tener grupos de opciones');
   });
 
-  test('2. Formulario de creación y edición no contiene interruptor ni texto de «Disponible para la venta»', () => {
+  test('2. Formulario y lista de productos contienen control claro de «Disponible» y «Pausado»', () => {
     const productsPagePath = path.resolve(__dirname, '../admin/src/pages/ProductsPage.tsx');
     const content = fs.readFileSync(productsPagePath, 'utf-8');
 
-    assert.ok(!content.includes('Disponible para la venta'), 'No debe existir el texto «Disponible para la venta» en el formulario');
-    assert.ok(!content.includes('Si está pausado'), 'No debe existir la advertencia «Si está pausado»');
-    assert.ok(!content.includes('formIsAvailable'), 'No debe existir el estado formIsAvailable');
-    assert.ok(!content.includes('handleToggleAvailability'), 'No debe existir función para pausar productos');
+    assert.ok(content.includes('formIsAvailable'), 'Debe existir el estado formIsAvailable para controlar la disponibilidad');
+    assert.ok(content.includes('handleToggleAvailability'), 'Debe existir la función handleToggleAvailability para pausar y reactivar');
+    assert.ok(content.includes('toggleProductAvailability'), 'Debe invocar toggleProductAvailability para persistir el cambio');
+    assert.ok(content.includes('Disponible') && content.includes('Pausado'), 'Debe mostrar claramente los estados «Disponible» y «Pausado»');
   });
 
-  test('3. Formulario tampoco contiene opciones, grupos ni personalizaciones', () => {
+  test('3. Formulario tampoco contiene opciones, grupos ni personalizaciones innecesarias', () => {
     const productsPagePath = path.resolve(__dirname, '../admin/src/pages/ProductsPage.tsx');
     const content = fs.readFileSync(productsPagePath, 'utf-8');
 
@@ -599,6 +599,7 @@ describe('10. Productos sin Opciones y sin Controles de Pausado en Formulario', 
     assert.ok(!content.includes('formOptionGroupIds'), 'No debe tener casillas de grupos de opciones');
     assert.ok(!content.includes('getOptionGroups'), 'No debe solicitar grupos de opciones a la base de datos');
   });
+
 
   test('4. Los productos creados están disponibles para la venta por defecto y visibles en la carta', () => {
     const catalog = [sampleProduct];

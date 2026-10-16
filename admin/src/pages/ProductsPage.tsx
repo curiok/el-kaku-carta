@@ -9,9 +9,11 @@ import {
   Eye,
   X,
   ArrowUpDown,
-  UtensilsCrossed
+  UtensilsCrossed,
+  CheckCircle2,
+  PauseCircle
 } from 'lucide-react';
-import { getProducts, saveProduct, deleteProduct, getCategories } from '../db';
+import { getProducts, saveProduct, deleteProduct, getCategories, toggleProductAvailability } from '../db';
 import { formatCurrency, generateId } from '../utils/formatters';
 import { ImageUploader } from '../components/ImageUploader';
 import { Lightbox } from '../components/Lightbox';
@@ -31,12 +33,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ALL');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Form State (Only: Nombre, Descripción, Precio, Categoría, Fotografías, Orden)
+  // Form State (Nombre, Descripción, Precio, Categoría, Fotografías, Orden, Disponibilidad)
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formPrice, setFormPrice] = useState<number>(0);
@@ -44,6 +47,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [formImages, setFormImages] = useState<string[]>([]);
   const [formMainImageIndex, setFormMainImageIndex] = useState(0);
   const [formSortOrder, setFormSortOrder] = useState<number>(1);
+  const [formIsAvailable, setFormIsAvailable] = useState<boolean>(true);
 
   // Preview Modal
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
@@ -88,6 +92,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setFormImages([]);
     setFormMainImageIndex(0);
     setFormSortOrder(products.length + 1);
+    setFormIsAvailable(true);
     setIsModalOpen(true);
   };
 
@@ -100,7 +105,26 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setFormImages(p.images || []);
     setFormMainImageIndex(p.mainImageIndex || 0);
     setFormSortOrder(p.sortOrder || 1);
+    setFormIsAvailable(p.isAvailable !== false);
     setIsModalOpen(true);
+  };
+
+  const handleToggleAvailability = async (p: Product) => {
+    const currentStatus = p.isAvailable !== false;
+    const newStatus = !currentStatus;
+    try {
+      await toggleProductAvailability(p.id, newStatus);
+      setProducts(prev =>
+        prev.map(item => item.id === p.id ? { ...item, isAvailable: newStatus } : item)
+      );
+      if (newStatus) {
+        showSuccess(`«${p.name}» reactivado — Ya está disponible en la carta pública.`);
+      } else {
+        showWarning(`«${p.name}» pausado — Oculto en la carta pública.`);
+      }
+    } catch (err: any) {
+      showError(`Error al actualizar disponibilidad: ${err.message}`);
+    }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -129,7 +153,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       images: formImages,
       mainImageIndex: formImages.length > 0 ? Math.min(formMainImageIndex, formImages.length - 1) : 0,
       sortOrder: Math.max(1, Number(formSortOrder) || 1),
-      isAvailable: true,
+      isAvailable: formIsAvailable,
       optionGroupIds: [],
       createdAt: editingProduct ? editingProduct.createdAt : now,
       updatedAt: now
@@ -151,7 +175,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       id: generateId('prod'),
       name: `${p.name} (Copia)`,
       sortOrder: products.length + 1,
-      isAvailable: true,
+      isAvailable: p.isAvailable !== false,
       optionGroupIds: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -190,8 +214,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategoryFilter === 'ALL' || p.categoryId === selectedCategoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesAvailability =
+      availabilityFilter === 'ALL' ||
+      (availabilityFilter === 'ACTIVE' && p.isAvailable !== false) ||
+      (availabilityFilter === 'PAUSED' && p.isAvailable === false);
+    return matchesSearch && matchesCategory && matchesAvailability;
   });
+
 
   return (
     <div>
@@ -231,6 +260,54 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <X size={16} />
           </button>
         )}
+      </div>
+
+      {/* Availability Status Filter */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <button
+          type="button"
+          className={`btn btn-sm ${availabilityFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ borderRadius: 'var(--radius-full)', padding: '4px 12px', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}
+          onClick={() => setAvailabilityFilter('ALL')}
+        >
+          Todos ({products.length})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${availabilityFilter === 'ACTIVE' ? 'btn-success' : 'btn-secondary'}`}
+          style={{
+            borderRadius: 'var(--radius-full)',
+            padding: '4px 12px',
+            fontSize: '11px',
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            color: availabilityFilter === 'ACTIVE' ? '#ffffff' : '#4ade80'
+          }}
+          onClick={() => setAvailabilityFilter('ACTIVE')}
+        >
+          <CheckCircle2 size={13} /> Disponibles ({products.filter(p => p.isAvailable !== false).length})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${availabilityFilter === 'PAUSED' ? 'btn-warning' : 'btn-secondary'}`}
+          style={{
+            borderRadius: 'var(--radius-full)',
+            padding: '4px 12px',
+            fontSize: '11px',
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            color: availabilityFilter === 'PAUSED' ? '#000000' : '#fbbf24'
+          }}
+          onClick={() => setAvailabilityFilter('PAUSED')}
+        >
+          <PauseCircle size={13} /> Pausados ({products.filter(p => p.isAvailable === false).length})
+        </button>
       </div>
 
       {/* Category Horizontal Filter Pills */}
@@ -284,6 +361,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredProducts.map(p => {
             const category = categories.find(c => c.id === p.categoryId);
+            const isAvail = p.isAvailable !== false;
             const mainImg = p.images && p.images.length > 0
               ? p.images[p.mainImageIndex || 0] || p.images[0]
               : null;
@@ -297,7 +375,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px',
-                  borderLeft: '3px solid var(--color-primary)'
+                  borderLeft: isAvail ? '4px solid #22c55e' : '4px solid #f59e0b',
+                  background: isAvail ? 'var(--color-card)' : 'rgba(32, 25, 17, 0.75)',
+                  opacity: isAvail ? 1 : 0.88,
+                  transition: 'all 0.2s ease'
                 }}
               >
                 {/* Main Product Info Row */}
@@ -363,7 +444,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         style={{
                           fontSize: '14px',
                           fontWeight: 700,
-                          color: 'var(--color-text)',
+                          color: isAvail ? 'var(--color-text)' : '#e2e8f0',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
@@ -375,7 +456,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         style={{
                           fontSize: '14px',
                           fontWeight: 800,
-                          color: 'var(--color-primary)',
+                          color: isAvail ? 'var(--color-primary)' : '#cbd5e1',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -401,6 +482,35 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       <span className="badge badge-info" style={{ fontSize: '9px', padding: '2px 6px' }}>
                         {category?.name || 'Sin categoría'}
                       </span>
+
+                      {/* Quick Mobile Status Badge / Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAvailability(p)}
+                        className={`btn btn-sm ${isAvail ? 'btn-success' : 'btn-warning'}`}
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-full)',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          color: isAvail ? '#ffffff' : '#000000'
+                        }}
+                        title={isAvail ? 'Tocar para pausar producto' : 'Tocar para reactivar producto'}
+                      >
+                        {isAvail ? (
+                          <>
+                            <CheckCircle2 size={11} /> Disponible
+                          </>
+                        ) : (
+                          <>
+                            <PauseCircle size={11} /> Pausado
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -413,9 +523,33 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     justifyContent: 'flex-end',
                     gap: '6px',
                     paddingTop: '8px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+                    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                    flexWrap: 'wrap'
                   }}
                 >
+                  {/* Dedicated Pause/Reactivate Action Button */}
+                  <button
+                    className={`btn btn-sm ${isAvail ? 'btn-secondary' : 'btn-success'}`}
+                    style={{
+                      padding: '4px 10px',
+                      minHeight: '32px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: isAvail ? '#fbbf24' : '#ffffff'
+                    }}
+                    title={isAvail ? 'Pausar producto (ocultar de la carta pública)' : 'Reactivar producto (mostrar en la carta pública)'}
+                    onClick={() => handleToggleAvailability(p)}
+                  >
+                    {isAvail ? (
+                      <>
+                        <PauseCircle size={14} /> Pausar
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={14} /> Reactivar
+                      </>
+                    )}
+                  </button>
                   <button
                     className="btn btn-secondary btn-sm"
                     style={{ padding: '4px 10px', minHeight: '32px', fontSize: '11px' }}
@@ -515,6 +649,58 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       ))}
                     </select>
                   </div>
+                </div>
+
+                {/* Availability State (Disponible / Pausado) */}
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label" style={{ fontWeight: 700, marginBottom: '6px' }}>
+                    Estado en la Carta Pública
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${formIsAvailable ? 'btn-success' : 'btn-secondary'}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '10px 12px',
+                        fontWeight: 700,
+                        borderRadius: 'var(--radius-sm)',
+                        border: formIsAvailable ? '2px solid #22c55e' : '1px solid var(--color-border)',
+                        background: formIsAvailable ? 'rgba(34, 197, 94, 0.2)' : 'var(--color-surface)',
+                        color: formIsAvailable ? '#4ade80' : 'var(--color-text-muted)'
+                      }}
+                      onClick={() => setFormIsAvailable(true)}
+                    >
+                      <CheckCircle2 size={16} /> Disponible
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${!formIsAvailable ? 'btn-warning' : 'btn-secondary'}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '10px 12px',
+                        fontWeight: 700,
+                        borderRadius: 'var(--radius-sm)',
+                        border: !formIsAvailable ? '2px solid #f59e0b' : '1px solid var(--color-border)',
+                        background: !formIsAvailable ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-surface)',
+                        color: !formIsAvailable ? '#fbbf24' : 'var(--color-text-muted)'
+                      }}
+                      onClick={() => setFormIsAvailable(false)}
+                    >
+                      <PauseCircle size={16} /> Pausado
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
+                    {formIsAvailable
+                      ? '✓ El producto aparece para los clientes en la carta pública.'
+                      : '⏸ El producto queda oculto en la carta (no se borra ninguna información, precio ni foto).'}
+                  </span>
                 </div>
 
                 {/* Sort Order */}

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 import type { Category, Product, OptionGroup, BusinessSettings, LocalOrder } from './types';
 import {
   getCategories,
@@ -11,13 +11,8 @@ import {
   saveSettings
 } from './db';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ryynkvtvodiaaelkdyab.supabase.co';
-const supabaseKey =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'sb_publishable_YGHVzWjmJmUWdxCvcBmA1w_p3StHy_T';
+export { supabase };
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Checks if Supabase tables are ready and accessible.

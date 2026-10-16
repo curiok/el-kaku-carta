@@ -16,7 +16,10 @@ import {
 import { useCart } from '../context/CartContext';
 import { formatCurrency, generateOrderId } from '../utils/formatters';
 import { buildWhatsAppOrderMessage, createWhatsAppLink, normalizeWhatsAppNumber } from '../utils/whatsapp';
+import { checkProductsAvailability, supabase } from '../supabase';
 import type { DeliveryType, PublicMenuData } from '../types';
+
+
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -59,7 +62,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const deliveryFee = deliveryType === 'delivery' && !isFreeDelivery ? (Number(business?.deliveryFee) || 0) : 0;
   const total = subtotal + deliveryFee;
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     setValidationError(null);
 
     if (items.length === 0) {
@@ -67,15 +70,39 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       return;
     }
 
-    // Verify that none of the items in the cart are paused/unavailable
-    if (menuData && menuData.products) {
-      const activeProductIds = new Set(menuData.products.filter(p => p.isAvailable).map(p => p.id));
-      const unavailable = items.find(it => !activeProductIds.has(it.productId));
-      if (unavailable) {
-        setValidationError(`El producto "${unavailable.productName}" ya no está disponible para la venta. Eliminalo del carrito para continuar.`);
+    // 1. Live availability check from Supabase & active menu catalog
+    try {
+      const productIds = items.map(it => it.productId);
+      const availMap = await checkProductsAvailability(productIds);
+
+      // Check if any product was marked paused in Supabase
+      const pausedInSupabase = items.find(it => availMap[it.productId] === false);
+      if (pausedInSupabase) {
+        setValidationError(`El producto «${pausedInSupabase.productName}» se encuentra pausado y no está disponible para ordenar. Por favor eliminalo de tu carrito para continuar.`);
         return;
       }
+
+      // Check if product was deleted or is missing from active catalog
+      if (menuData && menuData.products) {
+        const activeProductIds = new Set(menuData.products.filter(p => p.isAvailable).map(p => p.id));
+        const unavailable = items.find(it => !activeProductIds.has(it.productId) || availMap[it.productId] === false);
+        if (unavailable) {
+          setValidationError(`El producto «${unavailable.productName}» ya no está disponible para la venta. Eliminalo del carrito para continuar.`);
+          return;
+        }
+      }
+    } catch {
+      // Fallback to local menuData check
+      if (menuData && menuData.products) {
+        const activeProductIds = new Set(menuData.products.filter(p => p.isAvailable).map(p => p.id));
+        const unavailable = items.find(it => !activeProductIds.has(it.productId));
+        if (unavailable) {
+          setValidationError(`El producto «${unavailable.productName}» ya no está disponible para la venta. Eliminalo del carrito para continuar.`);
+          return;
+        }
+      }
     }
+
 
     if (!customerName.trim()) {
       setValidationError('Por favor ingresá tu nombre para que podamos identificar tu pedido.');
@@ -104,6 +131,35 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     });
 
     const whatsappUrl = createWhatsAppLink(phone, messageText);
+
+    // Save order to central Supabase orders table
+    try {
+      const orderPayload = {
+        id: orderId,
+        customer_name: customerName.trim(),
+        delivery_type: deliveryType,
+        address: deliveryType === 'delivery' ? address.trim() : null,
+        items: items.map(it => ({
+          productId: it.productId,
+          productName: it.productName,
+          unitBasePrice: it.unitBasePrice,
+          quantity: it.quantity,
+          selectedOptions: it.selectedOptions || [],
+          subtotal: it.subtotal
+        })),
+        subtotal: subtotal,
+        delivery_fee: deliveryFee,
+        total: total,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      supabase.from('orders').insert([orderPayload]).then(({ error }) => {
+        if (error) console.warn('Could not persist order to Supabase:', error.message);
+      });
+    } catch (sbErr) {
+      console.warn('Supabase order insert error:', sbErr);
+    }
 
     // Save locally to IndexedDB if possible (e.g. testing on same device)
     try {
@@ -138,6 +194,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     } catch (err) {
       // Ignore if IndexedDB is not used in standalone public menu
     }
+
 
     // Try opening WhatsApp
     window.open(whatsappUrl, '_blank');
@@ -236,35 +293,58 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             <>
               {/* Items List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                {items.map(item => (
-                  <div
-                    key={item.cartItemId}
-                    style={{
-                      background: 'var(--color-surface)',
-                      borderRadius: '12px',
-                      padding: '12px',
-                      border: '1px solid var(--color-border)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1, paddingRight: '8px' }}>
-                        <h4 style={{ fontSize: '14px', fontWeight: 800 }}>{item.productName}</h4>
-                        <div style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700 }}>
-                          {formatCurrency(item.unitFinalPrice)} c/u
+                {items.map(item => {
+                  const isAvailable = menuData?.products
+                    ? menuData.products.some(p => p.id === item.productId && p.isAvailable)
+                    : true;
+                  return (
+                    <div
+                      key={item.cartItemId}
+                      style={{
+                        background: 'var(--color-surface)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        border: isAvailable ? '1px solid var(--color-border)' : '1px solid #ef4444',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
+                    >
+                      {!isAvailable && (
+                        <div
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                            color: '#fca5a5',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <AlertCircle size={14} /> Producto pausado o no disponible
                         </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, paddingRight: '8px' }}>
+                          <h4 style={{ fontSize: '14px', fontWeight: 800 }}>{item.productName}</h4>
+                          <div style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700 }}>
+                            {formatCurrency(item.unitFinalPrice)} c/u
+                          </div>
+                        </div>
+
+                        <button
+                          style={{ background: 'none', border: 'none', color: isAvailable ? 'var(--color-text-muted)' : '#ef4444', cursor: 'pointer', padding: '4px' }}
+                          onClick={() => removeItem(item.cartItemId)}
+                          title="Eliminar del carrito"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
 
-                      <button
-                        style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px' }}
-                        onClick={() => removeItem(item.cartItemId)}
-                        title="Eliminar del carrito"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
 
                     {/* Options Breakdown */}
                     {item.selectedOptions && item.selectedOptions.length > 0 && (
@@ -314,7 +394,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
 
               {/* Modality Selector (Delivery vs Retiro) */}
