@@ -51,7 +51,7 @@ describe('2. Integración y Normalización de WhatsApp (Nuevo Formato Simplifica
     assert.equal(normalized, '5493821406662');
   });
 
-  test('Genera mensaje exacto para Delivery con Casa de y SIN precios, subtotales, totales ni IDs', () => {
+  test('Genera mensaje exacto para Delivery con Casa de y SIN observaciones cuando notes está vacío', () => {
     const message = buildWhatsAppOrderMessage({
       businessName: 'EL KAKU',
       orderId: 'KAKU-123456',
@@ -84,8 +84,7 @@ describe('2. Integración y Normalización de WhatsApp (Nuevo Formato Simplifica
       ],
       subtotal: 15000,
       deliveryFee: 1500,
-      total: 16500,
-      notes: 'Sin cebolla por favor'
+      total: 16500
     });
 
     const expected = [
@@ -111,8 +110,114 @@ describe('2. Integración y Normalización de WhatsApp (Nuevo Formato Simplifica
     assert.ok(!message.includes('Subtotal'), 'No debe incluir subtotal');
     assert.ok(!message.includes('TOTAL'), 'No debe incluir total');
     assert.ok(!message.includes('Envío'), 'No debe incluir precio ni etiqueta de envío');
-    assert.ok(!message.includes('Observaciones'), 'No debe incluir observaciones');
+    assert.ok(!message.includes('Observaciones'), 'No debe incluir observaciones si el cliente no escribió nada');
     assert.ok(!message.includes('Dirección:'), 'No debe usar la etiqueta Dirección, debe usar Casa de');
+  });
+
+  test('Genera mensaje exacto para Delivery incluyendo Observaciones debajo de Casa de cuando el cliente escribe notas', () => {
+    const message = buildWhatsAppOrderMessage({
+      businessName: 'EL KAKU',
+      orderId: 'KAKU-123456',
+      customerName: 'Ricardo',
+      deliveryType: 'delivery',
+      address: 'Silvana',
+      notes: 'Sin tomate y sin mayonesa.',
+      items: [
+        {
+          cartItemId: 'item_1',
+          productId: 'prod_1',
+          productName: 'Burger Activa',
+          productImage: '',
+          unitBasePrice: 12000,
+          unitFinalPrice: 12000,
+          quantity: 1,
+          selectedOptions: [],
+          subtotal: 12000
+        },
+        {
+          cartItemId: 'item_2',
+          productId: 'prod_2',
+          productName: 'Coca Cola',
+          productImage: '',
+          unitBasePrice: 3000,
+          unitFinalPrice: 3000,
+          quantity: 1,
+          selectedOptions: [],
+          subtotal: 3000
+        }
+      ]
+    });
+
+    const expected = [
+      '*PEDIDO NUEVO — EL KAKU*',
+      '',
+      '*Nombre:* Ricardo',
+      '',
+      '*Modalidad:* Delivery',
+      '',
+      '*Casa de:* Silvana',
+      '',
+      '*Observaciones:* Sin tomate y sin mayonesa.',
+      '',
+      '*PEDIDO:*',
+      '',
+      '1. 1 x Burger Activa',
+      '2. 1 x Coca Cola'
+    ].join('\n');
+
+    assert.equal(message, expected);
+    assert.ok(!message.includes('$'), 'No debe incluir precios');
+  });
+
+  test('Genera mensaje exacto para Retiro incluyendo Observaciones SIN mostrar Casa de', () => {
+    const message = buildWhatsAppOrderMessage({
+      businessName: 'EL KAKU',
+      customerName: 'Ricardo',
+      deliveryType: 'pickup',
+      notes: 'Sin tomate y sin mayonesa.',
+      items: [
+        {
+          cartItemId: 'item_1',
+          productId: 'prod_1',
+          productName: 'Burger Activa',
+          productImage: '',
+          unitBasePrice: 12000,
+          unitFinalPrice: 12000,
+          quantity: 1,
+          selectedOptions: [],
+          subtotal: 12000
+        },
+        {
+          cartItemId: 'item_2',
+          productId: 'prod_2',
+          productName: 'Coca Cola',
+          productImage: '',
+          unitBasePrice: 3000,
+          unitFinalPrice: 3000,
+          quantity: 1,
+          selectedOptions: [],
+          subtotal: 3000
+        }
+      ]
+    });
+
+    const expected = [
+      '*PEDIDO NUEVO — EL KAKU*',
+      '',
+      '*Nombre:* Ricardo',
+      '',
+      '*Modalidad:* Retiro',
+      '',
+      '*Observaciones:* Sin tomate y sin mayonesa.',
+      '',
+      '*PEDIDO:*',
+      '',
+      '1. 1 x Burger Activa',
+      '2. 1 x Coca Cola'
+    ].join('\n');
+
+    assert.equal(message, expected);
+    assert.ok(!message.includes('Casa de'), 'No debe mostrar Casa de en retiro');
   });
 
   test('Genera mensaje exacto para Retiro OMITIENDO completamente Casa de', () => {
@@ -553,8 +658,8 @@ describe('9. Aislamiento y Configuración PWA de El Kaku Admin en iPhone', () =>
 
     assert.ok(adminSw.includes('admin.html'), 'SW de admin debe proteger admin.html');
     assert.ok(menuSw.includes('admin.html'), 'SW del menú debe proteger admin.html');
-    assert.ok(adminSw.includes('kaku-pwa-cache-v6'), 'Debe tener versión de caché v6');
-    assert.ok(menuSw.includes('kaku-pwa-cache-v6'), 'Debe tener versión de caché v6');
+    assert.ok(adminSw.includes('kaku-pwa-cache-v7'), 'Debe tener versión de caché v7');
+    assert.ok(menuSw.includes('kaku-pwa-cache-v7'), 'Debe tener versión de caché v7');
   });
 });
 

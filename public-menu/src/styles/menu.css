@@ -300,3 +300,38 @@ body {
   font-weight: 800;
   color: var(--color-gold);
 }
+
+/* Form inputs */
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 2px rgba(201, 154, 22, 0.25);
+}
+
+.form-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.65;
+}

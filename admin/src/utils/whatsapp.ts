@@ -25,12 +25,14 @@ export function buildWhatsAppOrderMessage(params: BuildWhatsAppMessageParams): s
     customerName,
     deliveryType,
     address,
-    items = []
+    items = [],
+    notes
   } = params;
 
   const isDelivery = deliveryType === 'delivery';
   const name = (customerName || '').trim();
   const house = (address || '').trim();
+  const customerNotes = (notes || '').trim();
 
   const lines: string[] = [
     `*PEDIDO NUEVO — ${businessName.toUpperCase()}*`,
@@ -43,6 +45,11 @@ export function buildWhatsAppOrderMessage(params: BuildWhatsAppMessageParams): s
   if (isDelivery && house) {
     lines.push('');
     lines.push(`*Casa de:* ${house}`);
+  }
+
+  if (customerNotes) {
+    lines.push('');
+    lines.push(`*Observaciones:* ${customerNotes}`);
   }
 
   lines.push('');

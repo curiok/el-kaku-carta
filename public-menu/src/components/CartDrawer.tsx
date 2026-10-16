@@ -215,6 +215,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const handleFinishOrder = () => {
     clearCart();
+    setNotes('');
     setPreparedOrder(null);
     onClose();
   };
@@ -482,6 +483,22 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     </div>
                   </div>
                 )}
+
+                <div>
+                  <label className="form-label">¿Querés modificar algo de tu pedido?</label>
+                  <textarea
+                    className="form-input"
+                    placeholder="Ej.: sin tomate, sin mayonesa, sin cebolla..."
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    rows={2}
+                    style={{
+                      minHeight: '62px',
+                      resize: 'none',
+                      lineHeight: '1.4'
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Validation alert */}
