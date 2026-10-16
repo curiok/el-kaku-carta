@@ -47,18 +47,14 @@ let lastPublishStatus = null;
 
 const server = http.createServer(async (req, res) => {
   const env = loadEnv();
-  const origin = req.headers['origin'] || '';
-
-  // Security: only allow local origins
-  const isAllowedOrigin = !origin ||
-    origin.startsWith('http://localhost:') ||
-    origin.startsWith('http://127.0.0.1:');
+  const origin = req.headers['origin'] || '*';
 
   const headers = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : 'http://localhost:5173',
+    'Access-Control-Allow-Origin': origin === '*' ? '*' : origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
     'X-Content-Type-Options': 'nosniff'
   };
 
@@ -68,16 +64,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
 
-  // 1. Status endpoint
-  if (req.method === 'GET' && url.pathname === '/api/status') {
+  // 1. Status endpoint (supports /api/status and El Patio /api/digital-menu/info)
+  if (req.method === 'GET' && (url.pathname === '/api/status' || url.pathname === '/api/digital-menu/info')) {
     const isTokenSet = Boolean(env.GITHUB_TOKEN && env.GITHUB_TOKEN.trim().length > 10);
     res.writeHead(200, headers);
     res.end(JSON.stringify({
       ok: true,
-      service: 'El Kaku Local Publisher',
+      success: true,
+      service: 'El Kaku Publisher Backend',
       configured: isTokenSet,
+      repoConfigured: isTokenSet,
       repo: env.GITHUB_REPO,
       branch: env.GITHUB_BRANCH,
       publicUrl: `https://${env.GITHUB_REPO.split('/')[0]}.github.io/${env.GITHUB_REPO.split('/')[1]}/`,
@@ -109,8 +107,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3. Publish to GitHub endpoint
-  if (req.method === 'POST' && url.pathname === '/api/publish') {
+  // 3. Publish to GitHub endpoint (supports /api/publish and El Patio /api/digital-menu/publish)
+  if (req.method === 'POST' && (url.pathname === '/api/publish' || url.pathname === '/api/digital-menu/publish')) {
     try {
       const body = await parseJsonBody(req);
 
@@ -119,8 +117,9 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, headers);
         res.end(JSON.stringify({
           ok: false,
+          success: false,
           code: 'TOKEN_NOT_CONFIGURED',
-          message: 'El token de GitHub no está configurado. Por favor, creá el archivo publisher/.env con tu GITHUB_TOKEN antes de publicar.'
+          message: 'El token de GitHub no está configurado. Por favor, verificá que GITHUB_TOKEN esté definido en publisher/.env.'
         }));
         return;
       }
@@ -202,8 +201,8 @@ function parseJsonBody(req) {
 
 const env = loadEnv();
 const PORT = env.PUBLISHER_PORT || 3145;
-const HOST = '127.0.0.1'; // strictly localhost, never 0.0.0.0
+const HOST = process.env.PUBLISHER_HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(`[El Kaku Publisher] Servicio local protegido escuchando en http://${HOST}:${PORT}`);
+  console.log(`[El Kaku Publisher] Backend escuchando en http://${HOST}:${PORT}`);
 });

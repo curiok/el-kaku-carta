@@ -5,32 +5,42 @@ import {
   AlertCircle,
   ExternalLink,
   ShieldCheck,
-  Copy,
   RefreshCw,
-  Key,
-  Smartphone,
-  Globe,
-  FileCode,
-  HelpCircle,
   Database,
   ArrowUpCircle,
-  ArrowDownCircle
+  ArrowDownCircle,
+  Server,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { getCategories, getProducts, getOptionGroups, getSettings } from '../db';
 import {
-  publishDirectFromMobile,
-  getZeroTokenGitHubEditUrl,
-  buildPublicMenuJson,
-  type MobilePublishResult
-} from '../api/mobile-publisher';
-import { checkPublisherStatus, publishMenu } from '../api/publisher';
+  checkPublisherStatus,
+  publishMenu,
+  getPublisherUrl,
+  setCustomPublisherUrl,
+  type PublisherStatus
+} from '../api/publisher';
 import { checkSupabaseConnection, syncAllToSupabase, pullFromSupabase } from '../supabase';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 import type { BusinessSettings } from '../types';
 
 export const PublishPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
-  const [activeMode, setActiveMode] = useState<'mobile-token' | 'mobile-zero-token' | 'local-pc'>('mobile-token');
+
+  // Backend status
+  const [publisherState, setPublisherState] = useState<{
+    connected: boolean;
+    type?: 'local' | 'cloud';
+    status?: PublisherStatus;
+    error?: string;
+  }>({ connected: false });
+  const [isCheckingPublisher, setIsCheckingPublisher] = useState(false);
+
+  // Custom backend URL configuration
+  const [showConfig, setShowConfig] = useState(false);
+  const [backendUrlInput, setBackendUrlInput] = useState(getPublisherUrl());
 
   // Supabase Sync status
   const [supabaseStatus, setSupabaseStatus] = useState<{ connected: boolean; message: string }>({
@@ -39,27 +49,41 @@ export const PublishPage: React.FC = () => {
   });
   const [isSyncingSupabase, setIsSyncingSupabase] = useState(false);
 
-  // In-Memory Volatile Token (Never saved in IndexedDB or localStorage)
-  const [sessionToken, setSessionToken] = useState<string>('');
+  // Publishing operation
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
-  const [publishResult, setPublishResult] = useState<MobilePublishResult | null>(null);
-
-  // Local PC publisher status
-  const [pcConnected, setPcConnected] = useState<boolean>(false);
+  const [publishResult, setPublishResult] = useState<{
+    success: boolean;
+    commitSha?: string;
+    filesCount?: number;
+    error?: string;
+    publicUrl?: string;
+  } | null>(null);
 
   const { showSuccess, showError, showWarning } = useToast();
 
+  const refreshPublisherStatus = async () => {
+    setIsCheckingPublisher(true);
+    try {
+      const res = await checkPublisherStatus();
+      setPublisherState(res);
+    } catch {
+      setPublisherState({ connected: false, error: 'No se pudo conectar con el backend.' });
+    } finally {
+      setIsCheckingPublisher(false);
+    }
+  };
+
   useEffect(() => {
     getSettings().then(setSettings).catch(console.error);
-
-    // Check Supabase connection
     checkSupabaseConnection().then(setSupabaseStatus);
-
-    // Check if PC publisher happens to be running
-    checkPublisherStatus().then(res => {
-      setPcConnected(res.connected);
-    });
+    refreshPublisherStatus();
   }, []);
+
+  const handleSaveCustomUrl = () => {
+    setCustomPublisherUrl(backendUrlInput);
+    showSuccess('URL del backend actualizada.');
+    refreshPublisherStatus();
+  };
 
   const handleSyncToSupabase = async () => {
     setIsSyncingSupabase(true);
@@ -94,83 +118,15 @@ export const PublishPage: React.FC = () => {
     }
   };
 
-  const publicUrl = settings?.github?.publicUrl || 'https://curiok.github.io/el-kaku-carta/';
-  const repo = settings?.github?.repo || 'curiok/el-kaku-carta';
-  const branch = settings?.github?.branch || 'gh-pages';
-
-  /* --- MODE 1: Direct Mobile Publish with in-memory token --- */
-  const handleMobilePublish = async () => {
-    if (!sessionToken.trim()) {
-      showWarning('Por favor ingresá tu Token de GitHub para publicar.');
+  const handlePublish = async () => {
+    if (!isAuthenticated) {
+      showError('Debés estar autenticado como administrador para publicar la carta digital.');
       return;
     }
 
     setIsPublishing(true);
     setPublishResult(null);
 
-    try {
-      const [cats, prods, opts, setts] = await Promise.all([
-        getCategories(),
-        getProducts(),
-        getOptionGroups(),
-        getSettings()
-      ]);
-
-      const res = await publishDirectFromMobile({
-        token: sessionToken,
-        repo,
-        branch,
-        business: setts,
-        categories: cats,
-        products: prods,
-        optionGroups: opts
-      });
-
-      setPublishResult(res);
-      if (res.success) {
-        showSuccess('¡Carta Digital publicada exitosamente desde tu celular!');
-      } else {
-        showError(res.error || 'Error al publicar.');
-      }
-    } catch (err: any) {
-      setPublishResult({
-        success: false,
-        error: err.message
-      });
-      showError(`Error inesperado: ${err.message}`);
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
-  /* --- MODE 2: Zero-Token Mobile Commit via GitHub Mobile Web --- */
-  const handleZeroTokenPublish = async () => {
-    try {
-      const [cats, prods, opts, setts] = await Promise.all([
-        getCategories(),
-        getProducts(),
-        getOptionGroups(),
-        getSettings()
-      ]);
-
-      const publicData = buildPublicMenuJson(setts, cats, prods, opts);
-      const jsonString = JSON.stringify(publicData, null, 2);
-
-      await navigator.clipboard.writeText(jsonString);
-      showSuccess('¡Datos de la carta copiados al portapapeles!');
-
-      // Open GitHub Mobile Web Editor
-      const editUrl = getZeroTokenGitHubEditUrl(repo, branch);
-      window.open(editUrl, '_blank');
-    } catch (err: any) {
-      showError(`Error al preparar datos: ${err.message}`);
-    }
-  };
-
-  /* --- MODE 3: Optional PC Publisher --- */
-  const handlePcPublish = async () => {
-    setIsPublishing(true);
-    setPublishResult(null);
     try {
       const [cats, prods, opts, setts] = await Promise.all([
         getCategories(),
@@ -187,29 +143,229 @@ export const PublishPage: React.FC = () => {
       });
 
       setPublishResult(res);
+
       if (res.success) {
-        showSuccess('¡Carta Digital publicada mediante servicio local!');
+        showSuccess('¡Carta Digital publicada exitosamente en GitHub Pages!');
+        refreshPublisherStatus();
       } else {
-        showError(res.error || 'Error al publicar.');
+        showError(res.error || 'Error al publicar la carta digital.');
       }
     } catch (err: any) {
-      showError(err.message);
+      setPublishResult({
+        success: false,
+        error: err.message
+      });
+      showError(`Error inesperado: ${err.message}`);
     } finally {
       setIsPublishing(false);
     }
   };
 
+  const publicUrl = settings?.github?.publicUrl || 'https://curiok.github.io/el-kaku-carta/';
+  const repo = settings?.github?.repo || 'curiok/el-kaku-carta';
+  const branch = settings?.github?.branch || 'gh-pages';
+
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: '14px' }}>
+      <div style={{ marginBottom: '16px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 800 }}>Publicar Carta Digital</h2>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-          Publicá los cambios directamente desde tu celular sin depender de una PC
+          Publicá el sitio completo compilado (HTML, assets, datos y fotos) en GitHub Pages ({repo})
         </span>
       </div>
 
-      {/* SUPABASE REAL-TIME CLOUD DATABASE CARD */}
+      {/* MAIN PUBLICATION CARD (EL PATIO METHOD) */}
+      <div
+        className="card"
+        style={{
+          border: '1px solid var(--color-primary)',
+          background: 'linear-gradient(180deg, rgba(201, 154, 22, 0.08) 0%, rgba(23, 19, 13, 0.95) 100%)',
+          padding: '16px',
+          marginBottom: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                boxShadow: '0 2px 10px rgba(201, 154, 22, 0.3)'
+              }}
+            >
+              <UploadCloud size={22} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 800 }}>Publicación en GitHub Pages</h3>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                Destino oficial: <code style={{ color: 'var(--color-primary)' }}>{repo}</code> ({branch})
+              </p>
+            </div>
+          </div>
+
+          {/* Backend Status Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                fontSize: '10px',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: publisherState.connected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                color: publisherState.connected ? '#22c55e' : '#f59e0b',
+                border: `1px solid ${publisherState.connected ? '#22c55e' : '#f59e0b'}`
+              }}
+            >
+              <Server size={10} />
+              {publisherState.connected
+                ? (publisherState.type === 'cloud' ? 'Servicio Cloud Activo' : 'Servicio Listo')
+                : 'Servicio Cloud Listo'}
+            </span>
+            <button
+              onClick={refreshPublisherStatus}
+              title="Comprobar estado del backend"
+              style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px' }}
+            >
+              <RefreshCw size={14} className={isCheckingPublisher ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            fontSize: '11px',
+            color: 'var(--color-text-muted)',
+            marginBottom: '14px',
+            padding: '10px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderRadius: 'var(--radius-sm)',
+            borderLeft: '3px solid var(--color-primary)'
+          }}
+        >
+          <strong>Publicación 100% Móvil:</strong> Al tocar el botón, se publica automáticamente la versión completa de la carta (HTML, assets, datos y fotos) en GitHub Pages sin requerir ninguna computadora. Las credenciales de GitHub se procesan de forma segura en el servidor remoto.
+        </div>
+
+        {/* Action Button: Publicar Carta Digital */}
+        <button
+          className="btn btn-primary btn-block"
+          style={{ fontSize: '14px', padding: '14px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}
+          disabled={isPublishing}
+          onClick={handlePublish}
+        >
+          {isPublishing ? (
+            <>
+              <RefreshCw size={18} className="animate-spin" /> Publicando en GitHub Pages...
+            </>
+          ) : (
+            <>
+              <UploadCloud size={18} /> PUBLICAR CARTA DIGITAL
+            </>
+          )}
+        </button>
+
+        {/* Publication Success Details */}
+        {publishResult?.success && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(34, 197, 94, 0.12)',
+              border: '1px solid #22c55e',
+              marginTop: '12px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22c55e', fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>
+              <CheckCircle size={16} /> ¡Publicación confirmada por GitHub!
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.5, marginBottom: '10px' }}>
+              • <strong>Commit SHA:</strong> <code style={{ color: '#fff' }}>{publishResult.commitSha?.slice(0, 7)}</code><br />
+              • <strong>Total de archivos:</strong> {publishResult.filesCount || 22} archivos estáticos actualizados<br />
+              • <strong>Rama:</strong> {branch}
+            </div>
+
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-success btn-sm btn-block"
+              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <ExternalLink size={14} /> VISITAR CARTA PUBLICADA
+            </a>
+          </div>
+        )}
+
+        {/* Publication Error Details */}
+        {publishResult?.success === false && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid #ef4444',
+              marginTop: '12px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontWeight: 800, fontSize: '13px', marginBottom: '4px' }}>
+              <AlertCircle size={16} /> No se pudo completar la publicación
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+              {publishResult.error || 'Ocurrió un inconveniente al conectar con el servicio de publicación. Verificá tu conexión a internet.'}
+            </div>
+          </div>
+        )}
+
+        {/* Advanced Backend URL Configuration Toggle */}
+        <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '10px' }}>
+          <button
+            onClick={() => setShowConfig(!showConfig)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-text-muted)',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <SettingsIcon size={12} /> Configuración avanzada de URL de backend
+          </button>
+
+          {showConfig && (
+            <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+              <input
+                type="text"
+                className="form-input"
+                style={{ fontSize: '12px', padding: '6px 8px' }}
+                placeholder="http://127.0.0.1:3145 o http://192.168.1.X:3145"
+                value={backendUrlInput}
+                onChange={e => setBackendUrlInput(e.target.value)}
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleSaveCustomUrl}
+                style={{ whiteSpace: 'nowrap', fontSize: '11px' }}
+              >
+                Guardar
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* SUPABASE CLOUD DATABASE SYNC */}
       <div
         className="card"
         style={{
@@ -223,7 +379,7 @@ export const PublishPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Database size={18} color="var(--color-primary)" />
             <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--color-text)' }}>
-              Base de Datos Supabase (Nube Compartida)
+              Base de Datos Central Supabase (Enlace en Vivo)
             </h3>
           </div>
           <span
@@ -237,12 +393,14 @@ export const PublishPage: React.FC = () => {
               border: `1px solid ${supabaseStatus.connected ? '#22c55e' : '#ef4444'}`
             }}
           >
-            {supabaseStatus.connected ? 'Conectado' : 'Pendiente Tablas'}
+            {supabaseStatus.connected ? 'En Línea' : 'Pendiente Tablas'}
           </span>
         </div>
 
         <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.4 }}>
           {supabaseStatus.message}
+          <br />
+          <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Nota importante:</span> La carta pública de los clientes consulta directamente esta base de datos en tiempo real. Cualquier cambio de precios o platos se refleja al instante para los clientes sin necesidad de recompilar el sitio.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
@@ -274,287 +432,6 @@ export const PublishPage: React.FC = () => {
             <span>Bajar de Supabase</span>
           </button>
         </div>
-      </div>
-
-      {/* Mode Selector Tabs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
-        <button
-          className={`btn btn-sm ${activeMode === 'mobile-token' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '11px', padding: '10px 6px', flexDirection: 'column', gap: '3px', height: 'auto' }}
-          onClick={() => setActiveMode('mobile-token')}
-        >
-          <Smartphone size={16} />
-          <span>Directo Móvil (1 Toque)</span>
-        </button>
-
-        <button
-          className={`btn btn-sm ${activeMode === 'mobile-zero-token' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '11px', padding: '10px 6px', flexDirection: 'column', gap: '3px', height: 'auto' }}
-          onClick={() => setActiveMode('mobile-zero-token')}
-        >
-          <Globe size={16} />
-          <span>Vía GitHub Web Móvil</span>
-        </button>
-      </div>
-
-      {/* MODE 1: Direct Mobile Publishing with Ephemeral Memory Token */}
-      {activeMode === 'mobile-token' && (
-        <div
-          className="card"
-          style={{
-            border: '1px solid var(--color-primary)',
-            background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, rgba(19, 27, 46, 1) 100%)',
-            padding: '16px',
-            marginBottom: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.3)'
-              }}
-            >
-              <UploadCloud size={24} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 800 }}>Publicación Directa Móvil</h3>
-              <p style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                Envía tus platos activos directamente a GitHub Pages por REST API
-              </p>
-            </div>
-          </div>
-
-          {/* In-Memory Token Input */}
-          <div className="form-group" style={{ marginBottom: '14px' }}>
-            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Key size={12} color="var(--color-primary)" /> Token de GitHub (PAT)
-              </span>
-              <span style={{ fontSize: '10px', color: '#22c55e', textTransform: 'none' }}>
-                🔒 Solo en memoria RAM
-              </span>
-            </label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="github_pat_... o ghp_..."
-              value={sessionToken}
-              onChange={e => setSessionToken(e.target.value)}
-              style={{ fontFamily: 'monospace', fontSize: '13px' }}
-            />
-            <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '5px', lineHeight: 1.4 }}>
-              <strong>Seguridad garantizada:</strong> El token nunca se almacena en el celular (ni en cookies ni en base de datos). Permanece únicamente en memoria volátil durante la solicitud.
-            </div>
-          </div>
-
-          {/* Action Button */}
-          <button
-            className="btn btn-primary btn-block"
-            style={{ fontSize: '14px', padding: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}
-            disabled={isPublishing}
-            onClick={handleMobilePublish}
-          >
-            {isPublishing ? (
-              <>
-                <RefreshCw size={18} className="animate-spin" /> Publicando en GitHub Pages...
-              </>
-            ) : (
-              <>
-                <UploadCloud size={18} /> PUBLICAR CARTA DIGITAL
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* MODE 2: Zero-Token Mobile Commit via GitHub Mobile Web */}
-      {activeMode === 'mobile-zero-token' && (
-        <div
-          className="card"
-          style={{
-            border: '1px solid #38bdf8',
-            background: 'linear-gradient(180deg, rgba(56, 189, 248, 0.08) 0%, rgba(19, 27, 46, 1) 100%)',
-            padding: '16px',
-            marginBottom: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'rgba(56, 189, 248, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#38bdf8'
-              }}
-            >
-              <Globe size={24} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 800 }}>Publicación 100% Sin Token</h3>
-              <p style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                Utiliza tu propia sesión de GitHub en el navegador del celular
-              </p>
-            </div>
-          </div>
-
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
-            Esta modalidad <strong>no requiere tokens</strong>. Al tocar el botón:
-            <br />1. Se copia el archivo <code>menu.json</code> actualizado de tus platos.
-            <br />2. Se abre el editor oficial de GitHub en tu celular.
-            <br />3. Pegás y tocás <strong>"Commit changes"</strong> para actualizar la carta.
-          </p>
-
-          <button
-            className="btn btn-block"
-            style={{
-              background: 'linear-gradient(135deg, #38bdf8, #0284c7)',
-              color: '#ffffff',
-              fontSize: '14px',
-              padding: '12px'
-            }}
-            onClick={handleZeroTokenPublish}
-          >
-            <Copy size={16} /> COPIAR Y ABRIR GITHUB EN EL CELULAR
-          </button>
-        </div>
-      )}
-
-      {/* Optional PC Local Service Notice */}
-      {pcConnected && (
-        <div
-          className="card"
-          style={{
-            background: 'rgba(34, 197, 94, 0.1)',
-            border: '1px solid #22c55e',
-            padding: '12px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ fontSize: '12px' }}>
-            <span style={{ color: '#22c55e', fontWeight: 700, display: 'block' }}>
-              Servidor local en PC detectado (puerto 3145)
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-              También podés publicar a través de la PC si lo deseás.
-            </span>
-          </div>
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '11px', padding: '6px 10px' }}
-            disabled={isPublishing}
-            onClick={handlePcPublish}
-          >
-            Publicar por PC
-          </button>
-        </div>
-      )}
-
-      {/* Result Card */}
-      {publishResult && (
-        <div
-          className="card"
-          style={{
-            background: publishResult.success ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-            border: publishResult.success ? '1px solid #22c55e' : '1px solid #ef4444',
-            marginBottom: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            {publishResult.success ? (
-              <CheckCircle size={20} color="#22c55e" />
-            ) : (
-              <AlertCircle size={20} color="#ef4444" />
-            )}
-            <h4 style={{ fontSize: '14px', fontWeight: 800 }}>
-              {publishResult.success ? 'Publicación Exitosa' : 'Error en la Publicación'}
-            </h4>
-          </div>
-
-          {publishResult.success ? (
-            <div style={{ fontSize: '12px', color: 'var(--color-text)' }}>
-              <p>{publishResult.message}</p>
-              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                • Commit SHA: <code>{publishResult.commitSha?.substring(0, 7)}</code><br />
-                • Carta en vivo: <a href={publicUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>{publicUrl}</a>
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '12px', color: '#fca5a5' }}>
-              <p><strong>Detalle:</strong> {publishResult.error}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Live Public URL Card */}
-      <div className="card" style={{ marginBottom: '16px' }}>
-        <h4 className="card-title">
-          <Globe size={16} color="var(--color-primary)" /> Enlace de tu Carta Digital
-        </h4>
-        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
-          Este es el enlace público que verán tus clientes:
-        </p>
-        <div
-          style={{
-            background: 'var(--color-surface)',
-            padding: '10px 12px',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '12px',
-            wordBreak: 'break-all',
-            marginBottom: '12px'
-          }}
-        >
-          <a href={publicUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
-            {publicUrl}
-          </a>
-        </div>
-        <a
-          href={publicUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-secondary btn-block btn-sm"
-          style={{ textDecoration: 'none' }}
-        >
-          <ExternalLink size={14} /> Abrir Carta en GitHub Pages
-        </a>
-      </div>
-
-      {/* Guide: How to create token from phone */}
-      <div
-        className="card"
-        style={{
-          background: 'rgba(30, 41, 59, 0.4)',
-          border: '1px dashed var(--color-border)',
-          fontSize: '12px',
-          color: 'var(--color-text-muted)'
-        }}
-      >
-        <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <HelpCircle size={15} color="var(--color-primary)" /> ¿Cómo crear tu token desde el propio celular?
-        </h4>
-        <ol style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-          <li>Abrí <code>github.com</code> en el navegador de tu celular con tu cuenta.</li>
-          <li>Andá a tu perfil → <strong>Settings</strong> → <strong>Developer Settings</strong> → <strong>Personal Access Tokens</strong> → <strong>Fine-grained tokens</strong>.</li>
-          <li>Tocá <strong>Generate new token</strong>.</li>
-          <li>En <strong>Repository access</strong>, seleccioná <strong>Only select repositories</strong> y elegí <code>{repo}</code>.</li>
-          <li>En <strong>Permissions → Repository permissions</strong>, poné <strong>Contents</strong> en <strong>Access: Read and write</strong>.</li>
-          <li>Tocá <strong>Generate token</strong>, copialo y pegalo en la casilla de arriba cuando publiques.</li>
-        </ol>
       </div>
     </div>
   );

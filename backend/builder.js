@@ -1,0 +1,197 @@
+import fs from 'fs/promises';
+import fsSync from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Genera el paquete estático completo para GitHub Pages (Método El Patio)
+ * Incluye: index.html, admin.html, assets/, data/menu.json, fotos públicas, manifests, service workers y .nojekyll.
+ */
+export async function buildStaticMenuBundle(publicPayload) {
+  const {
+    business,
+    categories = [],
+    products = [],
+    optionGroups = []
+  } = publicPayload;
+
+  const filesMap = new Map(); // path -> { path, content, encoding }
+
+  // 1. Filtrar únicamente categorías y productos activos
+  const activeCategories = categories.filter(c => c.isActive);
+  const activeCategoryIds = new Set(activeCategories.map(c => c.id));
+
+  const activeProducts = products.filter(p => p.isAvailable && activeCategoryIds.has(p.categoryId));
+  const activeOptionGroupIds = new Set(activeProducts.flatMap(p => p.optionGroupIds || []));
+  const relevantOptionGroups = optionGroups.filter(og => og.isActive && activeOptionGroupIds.has(og.id));
+
+  // 2. Procesar imágenes de productos activos y extraer base64 en archivos individuales
+  const processedProducts = [];
+
+  for (const product of activeProducts) {
+    const processedImages = [];
+    const images = Array.isArray(product.images) ? product.images : [];
+
+    for (let idx = 0; idx < images.length; idx++) {
+      const img = images[idx];
+      if (typeof img === 'string' && img.startsWith('data:image/')) {
+        const matches = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+        if (matches) {
+          const ext = matches[1].includes('jpeg') ? 'jpg' : matches[1].includes('png') ? 'png' : 'webp';
+          const fileName = `images/prod_${product.id}_${idx}.${ext}`;
+          filesMap.set(fileName, {
+            path: fileName,
+            content: matches[2],
+            encoding: 'base64'
+          });
+          processedImages.push(`./${fileName}`);
+          continue;
+        }
+      }
+      processedImages.push(img);
+    }
+
+    processedProducts.push({
+      ...product,
+      images: processedImages
+    });
+  }
+
+  // 3. Construir data/menu.json público y limpio (CERO datos privados ni contraseñas)
+  const isFreeDelivery = (business?.deliveryFeeMode ?? 'free') === 'free';
+  const publicMenuData = {
+    version: '1.0.0',
+    generatedAt: new Date().toISOString(),
+    business: {
+      name: business?.name || 'El Kaku',
+      menuTitle: business?.menuTitle || 'Carta Digital El Kaku',
+      whatsappNumber: business?.whatsappNumber || '+54 9 3821 40-6662',
+      currencySymbol: business?.currencySymbol || '$',
+      deliveryEnabled: business?.deliveryEnabled ?? true,
+      pickupEnabled: business?.pickupEnabled ?? true,
+      deliveryFeeMode: isFreeDelivery ? 'free' : 'paid',
+      deliveryFee: isFreeDelivery ? 0 : (Number(business?.deliveryFee) || 0),
+      welcomeText: business?.welcomeText || '',
+      contactText: business?.contactText || '',
+      theme: business?.theme || {
+        primary: '#C99A16',
+        secondary: '#F07819',
+        background: '#17130D',
+        surface: '#241D14',
+        text: '#FFFDF8',
+        accent: '#D93620'
+      }
+    },
+    categories: activeCategories,
+    products: processedProducts,
+    optionGroups: relevantOptionGroups
+  };
+
+  const menuJsonContent = JSON.stringify(publicMenuData, null, 2);
+  filesMap.set('data/menu.json', {
+    path: 'data/menu.json',
+    content: menuJsonContent,
+    encoding: 'utf-8'
+  });
+
+  // 4. Asegurar archivo .nojekyll obligatorio para GitHub Pages
+  filesMap.set('.nojekyll', {
+    path: '.nojekyll',
+    content: '# disable jekyll for direct static hosting\n',
+    encoding: 'utf-8'
+  });
+
+  // 5. Cargar compilación de public-menu desde public-menu/dist
+  const publicMenuDistDir = path.resolve(__dirname, '../public-menu/dist');
+  if (!fsSync.existsSync(publicMenuDistDir) || !fsSync.existsSync(path.join(publicMenuDistDir, 'index.html'))) {
+    throw new Error('No se encontró index.html compilado en public-menu/dist. Ejecute npm run build antes de publicar.');
+  }
+
+  const publicDistFiles = await readDirRecursive(publicMenuDistDir);
+  for (const file of publicDistFiles) {
+    if (file.relPath === 'data/menu.json') continue; // Priorizar menu.json recién generado
+
+    const fileBuffer = await fs.readFile(file.fullPath);
+    const isBinary = isBinaryFile(file.relPath);
+
+    filesMap.set(file.relPath, {
+      path: file.relPath,
+      content: isBinary ? fileBuffer.toString('base64') : fileBuffer.toString('utf-8'),
+      encoding: isBinary ? 'base64' : 'utf-8'
+    });
+  }
+
+  // 6. Cargar compilación de admin desde admin/dist (como admin.html para mantener ambos en el mismo repo)
+  const adminDistDir = path.resolve(__dirname, '../admin/dist');
+  if (fsSync.existsSync(adminDistDir)) {
+    const adminFiles = await readDirRecursive(adminDistDir);
+    for (const file of adminFiles) {
+      if (file.relPath === 'manifest.webmanifest' || file.relPath === 'manifest.json') continue; // Mantener manifest público en raíz
+
+      const fileBuffer = await fs.readFile(file.fullPath);
+      const isBinary = isBinaryFile(file.relPath);
+      const targetPath = file.relPath === 'index.html' ? 'admin.html' : file.relPath;
+
+      filesMap.set(targetPath, {
+        path: targetPath,
+        content: isBinary ? fileBuffer.toString('base64') : fileBuffer.toString('utf-8'),
+        encoding: isBinary ? 'base64' : 'utf-8'
+      });
+    }
+  }
+
+  // 7. Verificación de integridad estricta (igual que El Patio)
+  const hasIndex = filesMap.has('index.html');
+  const hasMenuJson = filesMap.has('data/menu.json');
+  if (!hasIndex) {
+    throw new Error('Verificación fallida: index.html no está presente en el paquete de publicación.');
+  }
+  if (!hasMenuJson) {
+    throw new Error('Verificación fallida: data/menu.json no está presente en el paquete de publicación.');
+  }
+
+  // 8. Escribir copia en backend/dist-public para inspección local y respaldo
+  const exportDir = path.resolve(__dirname, 'dist-public');
+  await fs.rm(exportDir, { recursive: true, force: true });
+  await fs.mkdir(exportDir, { recursive: true });
+
+  const filesToUpload = Array.from(filesMap.values());
+  for (const file of filesToUpload) {
+    const dest = path.join(exportDir, file.path);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    if (file.encoding === 'base64') {
+      await fs.writeFile(dest, Buffer.from(file.content, 'base64'));
+    } else {
+      await fs.writeFile(dest, file.content, 'utf-8');
+    }
+  }
+
+  return {
+    files: filesToUpload,
+    publicMenuData,
+    localExportPath: exportDir
+  };
+}
+
+async function readDirRecursive(dir, base = dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const results = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relPath = path.relative(base, fullPath).replace(/\\/g, '/');
+    if (entry.isDirectory()) {
+      results.push(...await readDirRecursive(fullPath, base));
+    } else {
+      results.push({ fullPath, relPath });
+    }
+  }
+  return results;
+}
+
+function isBinaryFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  return ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.eot'].includes(ext);
+}

@@ -7,16 +7,18 @@
   "workspaces": [
     "admin",
     "public-menu",
-    "publisher"
+    "publisher",
+    "backend"
   ],
   "scripts": {
     "dev:admin": "npm --workspace=admin run dev",
     "dev:menu": "npm --workspace=public-menu run dev",
-    "start:publisher": "node publisher/server.js",
+    "start:backend": "node backend/server.js",
+    "start:publisher": "node backend/server.js",
     "build:menu": "npm --workspace=public-menu run build",
     "build:admin": "npm --workspace=admin run build",
     "build": "npm run build:menu && npm run build:admin",
-    "bundle:static": "npm run build && node publisher/export-bundle.js",
+    "bundle:static": "npm run build && node backend/builder.js",
     "test": "node tests/run-all-tests.js"
   },
   "keywords": [

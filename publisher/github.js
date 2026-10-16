@@ -118,8 +118,30 @@ export async function commitFilesToGitHub({ token, repo, branch, files, commitMe
   const commitData = await commitRes.json();
   const baseTreeSha = commitData.tree.sha;
 
-  // 3. Create Blobs for each file
+  // 3. Fetch existing tree recursively to reuse unchanged file blobs (like El Patio)
+  const existingBlobMap = new Map(); // path -> sha
+  try {
+    const treeRes = await fetch(`https://api.github.com/repos/${repo}/git/trees/${baseTreeSha}?recursive=1`, {
+      headers
+    });
+    if (treeRes.ok) {
+      const treeJson = await treeRes.json();
+      if (Array.isArray(treeJson?.tree)) {
+        for (const entry of treeJson.tree) {
+          if (entry.type === 'blob' && entry.path && entry.sha) {
+            existingBlobMap.set(entry.path, entry.sha);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[El Kaku Publisher] No se pudo leer el árbol previo para caché de blobs:', err.message);
+  }
+
+  // 4. Calculate local Git SHA-1 and separate files into unchanged vs files to upload
+  const crypto = await import('crypto');
   const treeItems = [];
+  const filesToUpload = [];
 
   for (const file of files) {
     // Security check: ensure path is safe
@@ -128,32 +150,69 @@ export async function commitFilesToGitHub({ token, repo, branch, files, commitMe
     }
 
     const isBase64 = file.encoding === 'base64';
-    const blobPayload = {
-      content: file.content,
-      encoding: isBase64 ? 'base64' : 'utf-8'
-    };
+    const buffer = isBase64 ? Buffer.from(file.content, 'base64') : Buffer.from(file.content, 'utf-8');
 
-    const blobRes = await fetch(`https://api.github.com/repos/${repo}/git/blobs`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(blobPayload)
-    });
+    // Native Git blob SHA: sha1("blob " + size + "\0" + content)
+    const gitBlobSha = crypto.default
+      .createHash('sha1')
+      .update(`blob ${buffer.length}\0`)
+      .update(buffer)
+      .digest('hex');
 
-    if (!blobRes.ok) {
-      throw new Error(`BLOB_CREATION_FAILED: Error al subir archivo ${file.path} (HTTP ${blobRes.status}).`);
+    const existingSha = existingBlobMap.get(file.path);
+    if (existingSha && existingSha === gitBlobSha) {
+      // Unchanged file: reuse existing blob SHA without HTTP overhead
+      treeItems.push({
+        path: file.path,
+        mode: '100644',
+        type: 'blob',
+        sha: existingSha
+      });
+    } else {
+      // New or modified file: enqueue for upload
+      filesToUpload.push({
+        path: file.path,
+        content: file.content,
+        encoding: isBase64 ? 'base64' : 'utf-8'
+      });
     }
-
-    const blobData = await blobRes.json();
-    treeItems.push({
-      path: file.path,
-      mode: '100644',
-      type: 'blob',
-      sha: blobData.sha
-    });
   }
 
-  // 4. Create new Tree
-  const treeRes = await fetch(`https://api.github.com/repos/${repo}/git/trees`, {
+  // 5. Upload new/modified blobs in controlled batches
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
+    const batch = filesToUpload.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async file => {
+        const blobRes = await fetch(`https://api.github.com/repos/${repo}/git/blobs`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            content: file.content,
+            encoding: file.encoding
+          })
+        });
+
+        if (!blobRes.ok) {
+          throw new Error(`BLOB_CREATION_FAILED: Error al subir archivo ${file.path} (HTTP ${blobRes.status}).`);
+        }
+
+        const blobData = await blobRes.json();
+        treeItems.push({
+          path: file.path,
+          mode: '100644',
+          type: 'blob',
+          sha: blobData.sha
+        });
+      })
+    );
+  }
+
+  // 6. Sort tree entries by path (mandatory for Git tree structure)
+  treeItems.sort((a, b) => a.path.localeCompare(b.path));
+
+  // 7. Create new Tree
+  const newTreeRes = await fetch(`https://api.github.com/repos/${repo}/git/trees`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -162,14 +221,14 @@ export async function commitFilesToGitHub({ token, repo, branch, files, commitMe
     })
   });
 
-  if (!treeRes.ok) {
-    throw new Error(`TREE_CREATION_FAILED: Error al generar árbol de Git (HTTP ${treeRes.status}).`);
+  if (!newTreeRes.ok) {
+    throw new Error(`TREE_CREATION_FAILED: Error al generar árbol de Git (HTTP ${newTreeRes.status}).`);
   }
 
-  const treeData = await treeRes.json();
-  const newTreeSha = treeData.sha;
+  const newTreeData = await newTreeRes.json();
+  const newTreeSha = newTreeData.sha;
 
-  // 5. Create Commit
+  // 8. Create Commit
   const newCommitRes = await fetch(`https://api.github.com/repos/${repo}/git/commits`, {
     method: 'POST',
     headers,
@@ -187,23 +246,35 @@ export async function commitFilesToGitHub({ token, repo, branch, files, commitMe
   const newCommitData = await newCommitRes.json();
   const newCommitSha = newCommitData.sha;
 
-  // 6. Update Branch Reference
+  // 9. Update Branch Reference atomically
   const updateRefRes = await fetch(`https://api.github.com/repos/${repo}/git/refs/heads/${branch}`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify({
       sha: newCommitSha,
-      force: false
+      force: true
     })
   });
 
   if (!updateRefRes.ok) {
-    throw new Error(`REF_UPDATE_FAILED: Error al actualizar rama ${branch} (HTTP ${updateRefRes.status}).`);
+    // If branch ref doesn't exist yet, create it with POST
+    const createRefRes = await fetch(`https://api.github.com/repos/${repo}/git/refs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ref: `refs/heads/${branch}`,
+        sha: newCommitSha
+      })
+    });
+    if (!createRefRes.ok) {
+      throw new Error(`REF_UPDATE_FAILED: Error al actualizar rama ${branch} (HTTP ${updateRefRes.status}).`);
+    }
   }
 
   return {
     success: true,
     commitSha: newCommitSha,
-    filesCount: treeItems.length
+    filesCount: treeItems.length,
+    uploadedCount: filesToUpload.length
   };
 }
