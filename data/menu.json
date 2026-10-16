@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-16T16:12:22.460Z",
+  "generatedAt": "2026-10-16T16:16:00.348Z",
   "business": {
     "name": "El Kaku",
     "menuTitle": "Carta Digital El Kaku",
@@ -22,6 +22,27 @@
     }
   },
   "categories": [
+    {
+      "id": "cat_promos",
+      "name": "Promociones",
+      "description": "Combos especiales para compartir al mejor precio",
+      "sortOrder": 1,
+      "isActive": true
+    },
+    {
+      "id": "cat_hamburguesas",
+      "name": "Hamburguesas",
+      "description": "Medallones 100% de ternera a la chapa en pan brioche artesanal",
+      "sortOrder": 2,
+      "isActive": true
+    },
+    {
+      "id": "cat_lomitos",
+      "name": "Lomitos",
+      "description": "Tiernos bifes de lomo seleccionados en pan casero crocante",
+      "sortOrder": 3,
+      "isActive": true
+    },
     {
       "id": "cat_pizzas",
       "name": "Pizzas",
@@ -55,27 +76,6 @@
       "name": "Postres",
       "description": "Dulzuras artesanales para el final perfecto",
       "sortOrder": 8,
-      "isActive": true
-    },
-    {
-      "id": "cat_promos",
-      "name": "Promociones",
-      "description": "Combos especiales para compartir al mejor precio",
-      "sortOrder": 1,
-      "isActive": true
-    },
-    {
-      "id": "cat_hamburguesas",
-      "name": "Hamburguesas",
-      "description": "Medallones 100% de ternera a la chapa en pan brioche artesanal",
-      "sortOrder": 2,
-      "isActive": true
-    },
-    {
-      "id": "cat_lomitos",
-      "name": "Lomitos",
-      "description": "Tiernos bifes de lomo seleccionados en pan casero crocante",
-      "sortOrder": 3,
       "isActive": true
     }
   ],
