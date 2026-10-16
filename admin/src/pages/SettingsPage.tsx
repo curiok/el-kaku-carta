@@ -16,7 +16,8 @@ import {
   Lock,
   KeyRound,
   ShieldCheck,
-  LogOut
+  LogOut,
+  Loader2
 } from 'lucide-react';
 import { getSettings, saveSettings, exportBackupData, importBackupData } from '../db';
 import { normalizeWhatsAppNumber } from '../utils/whatsapp';
@@ -70,9 +71,10 @@ export const SettingsPage: React.FC = () => {
       }
 
       await saveSettings(settings);
-      showSuccess('Configuración guardada correctamente.');
+      showSuccess('Cambios guardados correctamente.');
+      await loadSettings();
     } catch (err: any) {
-      showError(`Error al guardar: ${err.message}`);
+      showError(`Error al guardar: ${err.message || 'Error de conexión con Supabase'}`);
     } finally {
       setIsSaving(false);
     }
@@ -179,7 +181,7 @@ export const SettingsPage: React.FC = () => {
         </button>
       </div>
 
-      <form onSubmit={handleSave}>
+      <form noValidate onSubmit={handleSave}>
         {/* General Business Data */}
         <div className="card">
           <h4 className="card-title">
@@ -395,10 +397,20 @@ export const SettingsPage: React.FC = () => {
         <button
           type="submit"
           className="btn btn-primary btn-block"
-          style={{ marginBottom: '20px' }}
+          style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
           disabled={isSaving}
         >
-          <Save size={16} /> Guardar Configuración
+          {isSaving ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Guardando cambios...</span>
+            </>
+          ) : (
+            <>
+              <Save size={16} />
+              <span>Guardar Configuración</span>
+            </>
+          )}
         </button>
       </form>
 
@@ -411,7 +423,7 @@ export const SettingsPage: React.FC = () => {
           Cambiá el usuario y la contraseña de ingreso en este celular. La contraseña se almacena de forma segura usando derivación criptográfica PBKDF2 (SHA-256) con sal aleatoria.
         </p>
 
-        <form onSubmit={handleUpdateCredentials}>
+        <form noValidate onSubmit={handleUpdateCredentials}>
           <div className="form-group">
             <label className="form-label">Contraseña Actual</label>
             <input

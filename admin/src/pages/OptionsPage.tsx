@@ -7,7 +7,8 @@ import {
   PauseCircle,
   X,
   Sliders,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { getOptionGroups, saveOptionGroup, deleteOptionGroup } from '../db';
 import { formatCurrency, generateId } from '../utils/formatters';
@@ -20,6 +21,7 @@ export const OptionsPage: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<OptionGroup | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form State
   const [formName, setFormName] = useState('');
@@ -60,6 +62,7 @@ export const OptionsPage: React.FC = () => {
     setFormOptions([]);
     setNewOptName('');
     setNewOptPrice(0);
+    setIsSaving(false);
     setIsModalOpen(true);
   };
 
@@ -74,6 +77,7 @@ export const OptionsPage: React.FC = () => {
     setFormOptions([...og.options]);
     setNewOptName('');
     setNewOptPrice(0);
+    setIsSaving(false);
     setIsModalOpen(true);
   };
 
@@ -98,6 +102,7 @@ export const OptionsPage: React.FC = () => {
 
   const handleSaveGroup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
     if (!formName.trim()) {
       showWarning('El nombre del grupo no puede estar vacío.');
@@ -109,7 +114,10 @@ export const OptionsPage: React.FC = () => {
       return;
     }
 
+    setIsSaving(true);
+
     const groupToSave: OptionGroup = {
+      ...editingGroup,
       id: editingGroup ? editingGroup.id : generateId('grp'),
       name: formName.trim(),
       type: formType,
@@ -122,11 +130,13 @@ export const OptionsPage: React.FC = () => {
 
     try {
       await saveOptionGroup(groupToSave);
-      showSuccess(editingGroup ? 'Grupo de opciones actualizado.' : 'Grupo de opciones creado.');
+      showSuccess(editingGroup ? 'Cambios guardados correctamente.' : 'Grupo de opciones creado con éxito.');
       setIsModalOpen(false);
-      loadAll();
+      await loadAll();
     } catch (err: any) {
-      showError(`Error al guardar: ${err.message}`);
+      showError(`Error al guardar grupo: ${err.message || 'Error de conexión con Supabase'}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -288,7 +298,7 @@ export const OptionsPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveGroup} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form noValidate onSubmit={handleSaveGroup} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label">Nombre del Grupo *</label>
@@ -422,15 +432,25 @@ export const OptionsPage: React.FC = () => {
                   className="btn btn-secondary"
                   style={{ flex: 1 }}
                   onClick={() => setIsModalOpen(false)}
+                  disabled={isSaving}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  disabled={isSaving}
+                  onClick={handleSaveGroup}
                 >
-                  {editingGroup ? 'Guardar Cambios' : 'Crear Grupo'}
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Guardando cambios...</span>
+                    </>
+                  ) : (
+                    <span>{editingGroup ? 'Guardar Cambios' : 'Crear Grupo'}</span>
+                  )}
                 </button>
               </div>
             </form>

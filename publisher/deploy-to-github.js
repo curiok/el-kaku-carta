@@ -43,6 +43,82 @@ async function deploy() {
     }
   }
 
+  // Attempt to load fresh data directly from Supabase
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const SUPABASE_URL = 'https://ryynkvtvodiaaelkdyab.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_YGHVzWjmJmUWdxCvcBmA1w_p3StHy_T';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const [catRes, prodRes, optRes, setRes] = await Promise.all([
+      supabase.from('categories').select('*').order('sort_order', { ascending: true }),
+      supabase.from('products').select('*').order('sort_order', { ascending: true }),
+      supabase.from('option_groups').select('*').order('sort_order', { ascending: true }),
+      supabase.from('settings').select('*').limit(1).maybeSingle()
+    ]);
+
+    if (!catRes.error && catRes.data?.length > 0) {
+      payload.categories = catRes.data.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description || '',
+        sortOrder: c.sort_order ?? 0,
+        isActive: c.is_active ?? true
+      }));
+    }
+
+    if (!prodRes.error && prodRes.data?.length > 0) {
+      payload.products = prodRes.data.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        price: Number(p.price ?? p.base_price ?? 0),
+        categoryId: p.category_id,
+        isAvailable: p.is_available ?? true,
+        isFeatured: p.is_featured ?? false,
+        images: Array.isArray(p.images) ? p.images : [],
+        allergens: Array.isArray(p.allergens) ? p.allergens : [],
+        labels: Array.isArray(p.labels) ? p.labels : [],
+        optionGroupIds: Array.isArray(p.option_group_ids) ? p.option_group_ids : [],
+        sortOrder: p.sort_order ?? 0
+      }));
+    }
+
+    if (!optRes.error && optRes.data?.length > 0) {
+      payload.optionGroups = optRes.data.map(og => ({
+        id: og.id,
+        name: og.name,
+        minOptions: og.min_options ?? 0,
+        maxOptions: og.max_options ?? 1,
+        isRequired: og.is_required ?? false,
+        isActive: og.is_active ?? true,
+        sortOrder: og.sort_order ?? 0,
+        options: Array.isArray(og.options) ? og.options : []
+      }));
+    }
+
+    if (!setRes.error && setRes.data) {
+      const s = setRes.data;
+      payload.business = {
+        name: s.business_name || payload.business.name,
+        menuTitle: s.menu_title || payload.business.menuTitle,
+        whatsappNumber: s.whatsapp_number || payload.business.whatsappNumber,
+        currencySymbol: s.currency_symbol || payload.business.currencySymbol,
+        deliveryEnabled: s.delivery_enabled ?? payload.business.deliveryEnabled,
+        pickupEnabled: s.pickup_enabled ?? payload.business.pickupEnabled,
+        deliveryFeeMode: s.delivery_fee_mode || payload.business.deliveryFeeMode,
+        deliveryFee: s.delivery_fee_mode === 'paid' ? (Number(s.delivery_fee) || 0) : 0,
+        welcomeText: s.welcome_text ?? payload.business.welcomeText,
+        contactText: s.contact_text ?? payload.business.contactText,
+        theme: s.theme || payload.business.theme
+      };
+    }
+
+    console.log(`✓ Datos sincronizados desde Supabase (${payload.categories.length} categorías, ${payload.products.length} productos).`);
+  } catch (syncErr) {
+    console.warn('Nota: usando copia local de menu.json (error consultando Supabase:', syncErr.message, ')');
+  }
+
   const bundle = await buildStaticMenuBundle(payload);
   console.log(`Bundle generado con ${bundle.files.length} archivos.`);
 
@@ -51,7 +127,7 @@ async function deploy() {
     repo,
     branch,
     files: bundle.files,
-    commitMessage: 'Fix PWA iOS Admin Isolation: manifests, apple-touch-icons, sw-v4'
+    commitMessage: 'fix(admin): resolve product create/edit form submission and Supabase persistence'
   });
 
   console.log('✓ Despliegue completado con éxito!');

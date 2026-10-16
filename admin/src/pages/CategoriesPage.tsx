@@ -9,7 +9,8 @@ import {
   PauseCircle,
   X,
   FolderTree,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { getCategories, saveCategory, deleteCategory, getProducts, saveProduct } from '../db';
 import { generateId } from '../utils/formatters';
@@ -23,6 +24,7 @@ export const CategoriesPage: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
@@ -54,6 +56,7 @@ export const CategoriesPage: React.FC = () => {
     setFormName('');
     setFormDescription('');
     setFormIsActive(true);
+    setIsSaving(false);
     setIsModalOpen(true);
   };
 
@@ -62,11 +65,13 @@ export const CategoriesPage: React.FC = () => {
     setFormName(cat.name);
     setFormDescription(cat.description || '');
     setFormIsActive(cat.isActive);
+    setIsSaving(false);
     setIsModalOpen(true);
   };
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
     const trimmedName = formName.trim();
     if (!trimmedName) {
@@ -83,7 +88,10 @@ export const CategoriesPage: React.FC = () => {
       return;
     }
 
+    setIsSaving(true);
+
     const catToSave: Category = {
+      ...editingCategory,
       id: editingCategory ? editingCategory.id : generateId('cat'),
       name: trimmedName,
       description: formDescription.trim(),
@@ -93,11 +101,13 @@ export const CategoriesPage: React.FC = () => {
 
     try {
       await saveCategory(catToSave);
-      showSuccess(editingCategory ? 'Categoría actualizada.' : 'Categoría creada con éxito.');
+      showSuccess(editingCategory ? 'Cambios guardados correctamente.' : 'Categoría creada con éxito.');
       setIsModalOpen(false);
-      loadAll();
+      await loadAll();
     } catch (err: any) {
-      showError(`Error al guardar categoría: ${err.message}`);
+      showError(`Error al guardar categoría: ${err.message || 'Error de conexión con Supabase'}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -309,7 +319,7 @@ export const CategoriesPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveCategory}>
+            <form noValidate onSubmit={handleSaveCategory}>
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label">Nombre de la Categoría *</label>
@@ -359,15 +369,25 @@ export const CategoriesPage: React.FC = () => {
                   className="btn btn-secondary"
                   style={{ flex: 1 }}
                   onClick={() => setIsModalOpen(false)}
+                  disabled={isSaving}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  disabled={isSaving}
+                  onClick={handleSaveCategory}
                 >
-                  {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Guardando cambios...</span>
+                    </>
+                  ) : (
+                    <span>{editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}</span>
+                  )}
                 </button>
               </div>
             </form>

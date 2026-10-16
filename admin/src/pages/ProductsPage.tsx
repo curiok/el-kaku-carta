@@ -11,7 +11,8 @@ import {
   ArrowUpDown,
   UtensilsCrossed,
   CheckCircle2,
-  PauseCircle
+  PauseCircle,
+  Loader2
 } from 'lucide-react';
 import { getProducts, saveProduct, deleteProduct, getCategories, toggleProductAvailability } from '../db';
 import { formatCurrency, generateId } from '../utils/formatters';
@@ -38,6 +39,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form State (Nombre, Descripción, Precio, Categoría, Fotografías, Orden, Disponibilidad)
   const [formName, setFormName] = useState('');
@@ -93,19 +95,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setFormMainImageIndex(0);
     setFormSortOrder(products.length + 1);
     setFormIsAvailable(true);
+    setIsSaving(false);
     setIsModalOpen(true);
   };
 
   const openEditModal = (p: Product) => {
     setEditingProduct(p);
-    setFormName(p.name);
-    setFormDescription(p.description);
-    setFormPrice(p.basePrice);
-    setFormCategoryId(p.categoryId);
+    setFormName(p.name || '');
+    setFormDescription(p.description || '');
+    setFormPrice(p.basePrice || 0);
+    setFormCategoryId(p.categoryId || categories[0]?.id || '');
     setFormImages(p.images || []);
     setFormMainImageIndex(p.mainImageIndex || 0);
     setFormSortOrder(p.sortOrder || 1);
     setFormIsAvailable(p.isAvailable !== false);
+    setIsSaving(false);
     setIsModalOpen(true);
   };
 
@@ -129,43 +133,59 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
-    if (!formName.trim()) {
+    const trimmedName = formName.trim();
+    if (!trimmedName) {
       showWarning('El nombre del producto no puede estar vacío.');
       return;
     }
-    if (formPrice < 0) {
+    const numPrice = Number(formPrice);
+    if (isNaN(numPrice) || numPrice < 0) {
       showWarning('El precio no puede ser negativo.');
       return;
     }
-    if (!formCategoryId) {
+    const targetCategoryId = formCategoryId || categories[0]?.id || '';
+    if (!targetCategoryId) {
       showWarning('Debés seleccionar una categoría.');
       return;
     }
 
+    setIsSaving(true);
+
+    // Ensure selected main photo is placed at index 0 of images
+    let reorderedImages = [...formImages];
+    if (formMainImageIndex > 0 && formMainImageIndex < reorderedImages.length) {
+      const mainImg = reorderedImages[formMainImageIndex];
+      reorderedImages = [mainImg, ...reorderedImages.filter((_, idx) => idx !== formMainImageIndex)];
+    }
+
     const now = new Date().toISOString();
     const productToSave: Product = {
+      ...editingProduct,
       id: editingProduct ? editingProduct.id : generateId('prod'),
-      name: formName.trim(),
+      name: trimmedName,
       description: formDescription.trim(),
-      basePrice: Math.round(Number(formPrice)),
-      categoryId: formCategoryId,
-      images: formImages,
-      mainImageIndex: formImages.length > 0 ? Math.min(formMainImageIndex, formImages.length - 1) : 0,
-      sortOrder: Math.max(1, Number(formSortOrder) || 1),
+      basePrice: Math.round(numPrice),
+      categoryId: targetCategoryId,
+      images: reorderedImages,
+      mainImageIndex: 0,
+      sortOrder: Math.max(1, Number(formSortOrder) || (editingProduct?.sortOrder ?? products.length + 1)),
       isAvailable: formIsAvailable,
-      optionGroupIds: [],
+      optionGroupIds: editingProduct?.optionGroupIds || [],
       createdAt: editingProduct ? editingProduct.createdAt : now,
       updatedAt: now
     };
 
     try {
       await saveProduct(productToSave);
-      showSuccess(editingProduct ? 'Producto actualizado correctamente.' : 'Producto creado con éxito.');
+      showSuccess(editingProduct ? 'Cambios guardados correctamente.' : 'Producto creado con éxito.');
       setIsModalOpen(false);
-      loadAll();
+      await loadAll();
     } catch (err: any) {
-      showError(`Error al guardar: ${err.message}`);
+      showError(`Error al guardar: ${err.message || 'Error de conexión con Supabase'}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -603,7 +623,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form noValidate onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body">
                 {/* Product Name */}
                 <div className="form-group">
@@ -627,9 +647,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       className="form-input"
                       placeholder="Ej. 14500"
                       min="0"
-                      step="100"
-                      value={formPrice}
-                      onChange={e => setFormPrice(Number(e.target.value))}
+                      step="any"
+                      value={formPrice === 0 && !editingProduct ? '' : formPrice}
+                      onChange={e => setFormPrice(e.target.value === '' ? 0 : Number(e.target.value))}
                       required
                     />
                   </div>
@@ -638,7 +658,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <label className="form-label">Categoría *</label>
                     <select
                       className="form-select"
-                      value={formCategoryId}
+                      value={formCategoryId || categories[0]?.id || ''}
                       onChange={e => setFormCategoryId(e.target.value)}
                       required
                     >
@@ -747,15 +767,25 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   className="btn btn-secondary"
                   style={{ flex: 1 }}
                   onClick={() => setIsModalOpen(false)}
+                  disabled={isSaving}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  disabled={isSaving}
+                  onClick={handleSaveProduct}
                 >
-                  {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Guardando cambios...</span>
+                    </>
+                  ) : (
+                    <span>{editingProduct ? 'Guardar Cambios' : 'Crear Producto'}</span>
+                  )}
                 </button>
               </div>
             </form>
