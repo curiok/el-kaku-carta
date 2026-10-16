@@ -8,6 +8,7 @@ dist/
 */dist/
 publisher/dist-public/
 backend/dist-public/
+.github/
 
 # Environment and secrets (CRITICAL: never commit real secrets)
 .env
