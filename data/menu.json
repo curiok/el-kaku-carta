@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-16T19:38:41.675Z",
+  "generatedAt": "2026-10-16T20:10:51.330Z",
   "business": {
     "name": "El Kaku",
     "menuTitle": "Carta Digital El Kaku",
@@ -48,34 +48,6 @@
       "name": "Pizzas",
       "description": "Masa madre madurada 48hs con abundante mozzarella de primera",
       "sortOrder": 4,
-      "isActive": true
-    },
-    {
-      "id": "cat_empanadas",
-      "name": "Empanadas",
-      "description": "Rellenos tradicionales súper jugosos al horno de barro",
-      "sortOrder": 5,
-      "isActive": true
-    },
-    {
-      "id": "cat_papas",
-      "name": "Papas y Acompañamientos",
-      "description": "Papas rústicas cortadas a mano y bastones crocantes",
-      "sortOrder": 6,
-      "isActive": true
-    },
-    {
-      "id": "cat_bebidas",
-      "name": "Bebidas",
-      "description": "Gaseosas de litro y medio, cervezas artesanales y aguas",
-      "sortOrder": 7,
-      "isActive": true
-    },
-    {
-      "id": "cat_postres",
-      "name": "Postres",
-      "description": "Dulzuras artesanales para el final perfecto",
-      "sortOrder": 8,
       "isActive": true
     }
   ],
