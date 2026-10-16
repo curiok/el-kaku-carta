@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-16T03:15:12.222Z",
+  "generatedAt": "2026-10-16T16:12:22.460Z",
   "business": {
     "name": "El Kaku",
     "menuTitle": "Carta Digital El Kaku",
@@ -13,15 +13,50 @@
     "welcomeText": "¡Bienvenidos a El Kaku! Sabores únicos, hamburguesas gourmet, lomitos y pizzas a la piedra.",
     "contactText": "San Martín 450 • Envíos a domicilio y retiro en local",
     "theme": {
-      "primary": "#C99A16",
-      "secondary": "#F07819",
-      "background": "#17130D",
-      "surface": "#241D14",
       "text": "#FFFDF8",
-      "accent": "#D93620"
+      "accent": "#D93620",
+      "primary": "#C99A16",
+      "surface": "#241D14",
+      "secondary": "#F07819",
+      "background": "#17130D"
     }
   },
   "categories": [
+    {
+      "id": "cat_pizzas",
+      "name": "Pizzas",
+      "description": "Masa madre madurada 48hs con abundante mozzarella de primera",
+      "sortOrder": 4,
+      "isActive": true
+    },
+    {
+      "id": "cat_empanadas",
+      "name": "Empanadas",
+      "description": "Rellenos tradicionales súper jugosos al horno de barro",
+      "sortOrder": 5,
+      "isActive": true
+    },
+    {
+      "id": "cat_papas",
+      "name": "Papas y Acompañamientos",
+      "description": "Papas rústicas cortadas a mano y bastones crocantes",
+      "sortOrder": 6,
+      "isActive": true
+    },
+    {
+      "id": "cat_bebidas",
+      "name": "Bebidas",
+      "description": "Gaseosas de litro y medio, cervezas artesanales y aguas",
+      "sortOrder": 7,
+      "isActive": true
+    },
+    {
+      "id": "cat_postres",
+      "name": "Postres",
+      "description": "Dulzuras artesanales para el final perfecto",
+      "sortOrder": 8,
+      "isActive": true
+    },
     {
       "id": "cat_promos",
       "name": "Promociones",
@@ -57,9 +92,7 @@
       "mainImageIndex": 0,
       "sortOrder": 1,
       "isAvailable": true,
-      "optionGroupIds": [],
-      "createdAt": "2026-10-15T07:46:01.298Z",
-      "updatedAt": "2026-10-15T07:46:53.872Z"
+      "optionGroupIds": []
     },
     {
       "id": "prod_mv8mtbpn_1to0t",
@@ -73,9 +106,7 @@
       "mainImageIndex": 0,
       "sortOrder": 2,
       "isAvailable": true,
-      "optionGroupIds": [],
-      "createdAt": "2026-10-14T21:38:31.690Z",
-      "updatedAt": "2026-10-15T07:47:09.266Z"
+      "optionGroupIds": []
     },
     {
       "id": "prod_mv8mxfys_yn8uz",
@@ -89,9 +120,7 @@
       "mainImageIndex": 0,
       "sortOrder": 3,
       "isAvailable": true,
-      "optionGroupIds": [],
-      "createdAt": "2026-10-14T21:41:43.828Z",
-      "updatedAt": "2026-10-15T07:47:14.137Z"
+      "optionGroupIds": []
     },
     {
       "id": "prod_mv8mufoq_k8a8x",
@@ -105,9 +134,7 @@
       "mainImageIndex": 0,
       "sortOrder": 4,
       "isAvailable": true,
-      "optionGroupIds": [],
-      "createdAt": "2026-10-14T21:39:23.498Z",
-      "updatedAt": "2026-10-16T03:07:56.049Z"
+      "optionGroupIds": []
     },
     {
       "id": "prod_mv8n35i7_ci3qh",
@@ -121,9 +148,7 @@
       "mainImageIndex": 0,
       "sortOrder": 5,
       "isAvailable": true,
-      "optionGroupIds": [],
-      "createdAt": "2026-10-14T21:46:10.207Z",
-      "updatedAt": "2026-10-15T07:47:25.675Z"
+      "optionGroupIds": []
     }
   ],
   "optionGroups": []
